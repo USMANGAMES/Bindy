@@ -1,0 +1,66 @@
+@import 'tailwindcss';
+@import 'leaflet/dist/leaflet.css';
+
+@theme {
+  --color-bindy-mint: #10b981;
+  --color-bindy-bg: #f9fafb;
+  --color-bindy-text: #1f2937;
+  --color-bindy-accent: #f59e0b;
+  --color-bindy-charcoal: #1f2937;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --radius-3xl: 1.5rem;
+  --shadow-soft: 0 8px 32px rgba(31, 41, 55, 0.08);
+  --shadow-fab: 0 12px 40px rgba(16, 185, 129, 0.35);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bindy-bg);
+  color: var(--color-bindy-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+@media (min-width: 768px) {
+  body {
+    background: linear-gradient(135deg, #ecfdf5 0%, #f9fafb 50%, #fffbeb 100%);
+  }
+}
+
+.leaflet-container {
+  font-family: var(--font-sans);
+  background: #e8f5f0;
+}
+
+.leaflet-control-attribution {
+  display: none !important;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.2;
+  }
+  100% {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+}

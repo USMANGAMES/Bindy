@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="112" fill="#10B981"/>
+  <path d="M256 120c-20 0-36 16-36 36 0 14 8 26 20 32l-28 140h88l-28-140c12-6 20-18 20-32 0-20-16-36-36-36z" fill="white" opacity="0.95"/>
+  <ellipse cx="256" cy="380" rx="72" ry="24" fill="white" opacity="0.25"/>
+  <text x="256" y="460" text-anchor="middle" font-family="Inter,sans-serif" font-size="48" font-weight="700" fill="white">bindy</text>
+</svg>
