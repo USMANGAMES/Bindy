@@ -28,7 +28,7 @@ export function PhotoPreviewModal({ photoUrl, onRetake, onSend }: PhotoPreviewMo
         </div>
 
         <p className="mt-4 text-center text-sm text-gray-500">
-          Does this look good? Bindy AI will identify the bin type.
+          Bindy AI bin yoki trash ekanini o‘zi aniqlaydi.
         </p>
 
         <div className="mt-5 flex gap-3">
@@ -37,14 +37,14 @@ export function PhotoPreviewModal({ photoUrl, onRetake, onSend }: PhotoPreviewMo
             onClick={onRetake}
             className="flex-1 rounded-3xl border-2 border-gray-200 bg-white py-4 text-sm font-semibold text-bindy-text transition-colors hover:border-gray-300 active:scale-[0.98]"
           >
-            Retake
+            Qayta olish
           </button>
           <button
             type="button"
             onClick={onSend}
             className="flex-1 rounded-3xl bg-bindy-mint py-4 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(16,185,129,0.35)] transition-all hover:bg-[#0ea572] active:scale-[0.98]"
           >
-            Send to Bindy
+            Bindy ga yuborish
           </button>
         </div>
       </motion.div>

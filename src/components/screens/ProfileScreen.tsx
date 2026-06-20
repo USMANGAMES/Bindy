@@ -1,19 +1,13 @@
-import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Flame, Leaf, Recycle, Star } from 'lucide-react'
+import { Flame, Leaf, LogOut, Recycle, Star } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
+import { useAuth } from '../../context/AuthContext'
 import { BIN_TYPE_EMOJI, BIN_TYPE_LABELS } from '../../data/bins'
 
 export function ProfileScreen() {
-  const { state, updateName } = useApp()
+  const { state } = useApp()
+  const { user, logout } = useAuth()
   const { profile } = state
-  const [editing, setEditing] = useState(false)
-  const [nameDraft, setNameDraft] = useState(profile.name)
-
-  const saveName = () => {
-    if (nameDraft.trim()) updateName(nameDraft.trim())
-    setEditing(false)
-  }
 
   const stats = [
     { label: 'Eco points', value: profile.points, icon: Star, color: 'text-bindy-accent' },
@@ -27,7 +21,7 @@ export function ProfileScreen() {
         <h1 className="text-2xl font-bold text-bindy-text">Profile</h1>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+      <div className="flex-1 overflow-y-auto px-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -38,21 +32,8 @@ export function ProfileScreen() {
               {profile.name.slice(0, 2).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              {editing ? (
-                <input
-                  value={nameDraft}
-                  onChange={(e) => setNameDraft(e.target.value)}
-                  onBlur={saveName}
-                  onKeyDown={(e) => e.key === 'Enter' && saveName()}
-                  autoFocus
-                  className="w-full rounded-xl bg-white/20 px-3 py-1.5 text-lg font-bold outline-none placeholder:text-white/60"
-                />
-              ) : (
-                <button type="button" onClick={() => setEditing(true)} className="text-left">
-                  <h2 className="text-xl font-bold">{profile.name}</h2>
-                  <p className="text-sm text-white/70">Tap to edit name</p>
-                </button>
-              )}
+              <h2 className="text-xl font-bold">{profile.name}</h2>
+              <p className="text-sm text-white/70">@{user?.username ?? profile.name}</p>
             </div>
             <Leaf className="h-8 w-8 text-white/40" />
           </div>
@@ -74,6 +55,15 @@ export function ProfileScreen() {
           ))}
         </div>
 
+        <button
+          type="button"
+          onClick={logout}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-3xl border border-red-200 bg-white py-3.5 text-sm font-semibold text-red-600 shadow-soft"
+        >
+          <LogOut className="h-4 w-4" />
+          Chiqish
+        </button>
+
         <div className="mt-6">
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
             Recent activity
@@ -93,10 +83,15 @@ export function ProfileScreen() {
                   transition={{ delay: i * 0.04 }}
                   className="flex items-center gap-3 rounded-3xl bg-white p-4 shadow-soft"
                 >
-                  <span className="text-2xl">{BIN_TYPE_EMOJI[sub.type]}</span>
+                  <span className="text-2xl">
+                    {sub.category === 'trash' ? '🗑️' : BIN_TYPE_EMOJI[sub.type]}
+                  </span>
                   <div className="flex-1">
-                    <p className="font-semibold text-bindy-text">{BIN_TYPE_LABELS[sub.type]}</p>
+                    <p className="font-semibold text-bindy-text">
+                      {sub.category === 'trash' ? 'Noqonuniy musor' : BIN_TYPE_LABELS[sub.type]}
+                    </p>
                     <p className="text-xs text-gray-500">
+                      {sub.category === 'bin' ? 'Bin' : 'Trash'} ·{' '}
                       {new Date(sub.createdAt).toLocaleDateString(undefined, {
                         month: 'short',
                         day: 'numeric',

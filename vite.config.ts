@@ -9,7 +9,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['logo.png'],
       manifest: {
         name: 'Bindy — Eco Recycling',
         short_name: 'Bindy',
@@ -22,19 +22,36 @@ export default defineConfig({
         categories: ['lifestyle', 'utilities'],
         icons: [
           {
-            src: '/favicon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: '/logo.png',
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'any',
           },
           {
-            src: '/icon-512.svg',
+            src: '/logo.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'maskable',
           },
         ],
       },
     }),
   ],
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: false,
+    // Tailscale / LAN — barcha host nomlariga ruxsat
+    allowedHosts: true,
+    hmr: {
+      // Tailscale orqali kirganda HMR ishlashi uchun
+      clientPort: 5173,
+    },
+  },
+  preview: {
+    host: '0.0.0.0',
+    port: 4173,
+    strictPort: false,
+    allowedHosts: true,
+  },
 })

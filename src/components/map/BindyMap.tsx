@@ -1,17 +1,21 @@
 import { useEffect, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import type { RecyclingBin } from '../../types'
+import type { RecyclingBin, RouteResult } from '../../types'
+import type { CommunityReport } from '../../hooks/useCommunityReports'
 import { SEED_BINS } from '../../data/bins'
+import { haversineKm } from '../../utils/geo'
+import { RouteLayer, RouteFitBounds, NavigationFollow } from './RouteLayer'
 import 'leaflet/dist/leaflet.css'
 
-function createBinIcon(selected: boolean) {
+function createBinIcon(selected: boolean, navigating: boolean) {
+  const bg = navigating ? '#F59E0B' : selected ? '#F59E0B' : '#10B981'
   return L.divIcon({
     className: '',
     html: `
       <div style="
         width:36px;height:36px;
-        background:${selected ? '#F59E0B' : '#10B981'};
+        background:${bg};
         border:3px solid white;
         border-radius:50% 50% 50% 0;
         transform:rotate(-45deg);
@@ -23,6 +27,48 @@ function createBinIcon(selected: boolean) {
     iconSize: [36, 36],
     iconAnchor: [18, 36],
     popupAnchor: [0, -36],
+  })
+}
+
+function createCommunityBinIcon(selected: boolean, navigating: boolean) {
+  const bg = navigating ? '#F59E0B' : selected ? '#0EA572' : '#34D399'
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="
+        width:32px;height:32px;
+        background:${bg};
+        border:2px dashed white;
+        border-radius:50% 50% 50% 0;
+        transform:rotate(-45deg);
+        box-shadow:0 4px 12px rgba(16,185,129,0.35);
+        display:flex;align-items:center;justify-content:center;
+      ">
+        <span style="transform:rotate(45deg);font-size:12px">♻</span>
+      </div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+  })
+}
+
+function createTrashIcon(selected: boolean, navigating: boolean) {
+  const bg = navigating ? '#F59E0B' : selected ? '#DC2626' : '#F59E0B'
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="
+        width:34px;height:34px;
+        background:${bg};
+        border:3px solid white;
+        border-radius:50% 50% 50% 0;
+        transform:rotate(-45deg);
+        box-shadow:0 4px 14px rgba(245,158,11,0.5);
+        display:flex;align-items:center;justify-content:center;
+      ">
+        <span style="transform:rotate(45deg);font-size:13px">🗑</span>
+      </div>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 34],
   })
 }
 
@@ -39,51 +85,71 @@ const userIcon = L.divIcon({
 
 function MapController({
   center,
-  selectedId,
+  flyToTarget,
+  isNavigating,
 }: {
   center: [number, number]
-  selectedId: string | null
+  flyToTarget: { lat: number; lng: number } | null
+  isNavigating: boolean
 }) {
   const map = useMap()
 
   useEffect(() => {
+    if (isNavigating) return
     map.setView(center, map.getZoom(), { animate: true })
-  }, [center, map])
+  }, [center, map, isNavigating])
 
   useEffect(() => {
-    if (!selectedId) return
-    const bin = SEED_BINS.find((b) => b.id === selectedId)
-    if (bin) map.flyTo([bin.lat, bin.lng], 16, { duration: 0.8 })
-  }, [selectedId, map])
+    if (isNavigating || !flyToTarget) return
+    map.flyTo([flyToTarget.lat, flyToTarget.lng], 16, { duration: 0.8 })
+  }, [flyToTarget, map, isNavigating])
 
   return null
 }
 
-function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371
-  const dLat = ((lat2 - lat1) * Math.PI) / 180
-  const dLon = ((lon2 - lon1) * Math.PI) / 180
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
 type BindyMapProps = {
   userPosition: [number, number]
+  communityTrash: CommunityReport[]
+  communityBins: CommunityReport[]
   selectedBinId: string | null
-  onSelectBin: (bin: RecyclingBin) => void
+  selectedReportId: string | null
+  navigationTargetId: string | null
+  route: RouteResult | null
+  isNavigating: boolean
+  onSelectSeedBin: (bin: RecyclingBin) => void
+  onSelectReport: (report: CommunityReport) => void
 }
 
-export function BindyMap({ userPosition, selectedBinId, onSelectBin }: BindyMapProps) {
-  const binsWithDistance = useMemo(() => {
+export function BindyMap({
+  userPosition,
+  communityTrash,
+  communityBins,
+  selectedBinId,
+  selectedReportId,
+  navigationTargetId,
+  route,
+  isNavigating,
+  onSelectSeedBin,
+  onSelectReport,
+}: BindyMapProps) {
+  const seedBins = useMemo(() => {
     return SEED_BINS.map((bin) => ({
       ...bin,
-      distance: haversine(userPosition[0], userPosition[1], bin.lat, bin.lng),
-    })).sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
+      distanceM: Math.round(haversineKm(userPosition[0], userPosition[1], bin.lat, bin.lng) * 1000),
+    }))
   }, [userPosition])
 
-  const nearbyCount = binsWithDistance.filter((b) => (b.distance ?? 99) < 0.5).length
+  const flyToTarget = useMemo(() => {
+    if (selectedReportId) {
+      const r = [...communityTrash, ...communityBins].find((x) => x.id === selectedReportId)
+      if (r) return { lat: r.lat, lng: r.lng }
+    }
+    if (selectedBinId) {
+      const b = SEED_BINS.find((x) => x.id === selectedBinId)
+      if (b) return { lat: b.lat, lng: b.lng }
+    }
+    return null
+  }, [selectedBinId, selectedReportId, communityTrash, communityBins])
 
   return (
     <div className="absolute inset-0">
@@ -98,26 +164,50 @@ export function BindyMap({ userPosition, selectedBinId, onSelectBin }: BindyMapP
           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
           maxZoom={20}
         />
-        <MapController center={userPosition} selectedId={selectedBinId} />
-        <Marker position={userPosition} icon={userIcon} />
-        {binsWithDistance.map((bin) => (
+        <MapController center={userPosition} flyToTarget={flyToTarget} isNavigating={isNavigating} />
+        <RouteLayer route={route} />
+        <RouteFitBounds route={isNavigating ? route : null} />
+        <NavigationFollow userPosition={userPosition} active={isNavigating} />
+        <Marker position={userPosition} icon={userIcon} zIndexOffset={1000} />
+
+        {seedBins.map((bin) => (
           <Marker
             key={bin.id}
             position={[bin.lat, bin.lng]}
-            icon={createBinIcon(bin.id === selectedBinId)}
-            eventHandlers={{ click: () => onSelectBin(bin) }}
+            icon={createBinIcon(
+              bin.id === selectedBinId,
+              bin.id === navigationTargetId && isNavigating,
+            )}
+            eventHandlers={{ click: () => onSelectSeedBin(bin) }}
+          />
+        ))}
+
+        {communityBins.map((report) => (
+          <Marker
+            key={report.id}
+            position={[report.lat, report.lng]}
+            icon={createCommunityBinIcon(
+              report.id === selectedReportId,
+              report.id === navigationTargetId && isNavigating,
+            )}
+            zIndexOffset={400}
+            eventHandlers={{ click: () => onSelectReport(report) }}
+          />
+        ))}
+
+        {communityTrash.map((report) => (
+          <Marker
+            key={report.id}
+            position={[report.lat, report.lng]}
+            icon={createTrashIcon(
+              report.id === selectedReportId,
+              report.id === navigationTargetId && isNavigating,
+            )}
+            zIndexOffset={450}
+            eventHandlers={{ click: () => onSelectReport(report) }}
           />
         ))}
       </MapContainer>
-
-      <div className="pointer-events-none absolute bottom-28 left-4 right-4 z-[500]">
-        <div className="pointer-events-auto rounded-3xl bg-white/90 p-4 shadow-soft backdrop-blur-md">
-          <p className="text-xs font-semibold uppercase tracking-wider text-bindy-mint">Nearby</p>
-          <p className="mt-0.5 text-sm font-bold text-bindy-text">
-            {nearbyCount || binsWithDistance.length} recycling bins within 500m
-          </p>
-        </div>
-      </div>
     </div>
   )
 }

@@ -2,29 +2,27 @@ import { useCallback, useRef, useState } from 'react'
 import type { BinAnalysis, CaptureView } from '../types'
 import { analyzeBinPhoto } from '../services/aiService'
 import { useApp } from '../context/AppContext'
+import { fileToDataUrl } from '../utils/file'
 
-export function useCaptureFlow() {
+export function useCaptureFlow(userPosition: [number, number]) {
   const { recordSubmission } = useApp()
   const [view, setView] = useState<CaptureView>('idle')
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [analysis, setAnalysis] = useState<BinAnalysis | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const positionRef = useRef(userPosition)
+  positionRef.current = userPosition
 
   const revokePhoto = useCallback((url: string | null) => {
     if (url?.startsWith('blob:')) URL.revokeObjectURL(url)
   }, [])
 
   const openCamera = useCallback(() => {
-    fileInputRef.current?.click()
+    setView('camera')
   }, [])
 
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      e.target.value = ''
-      if (!file) return
-
+  const setPhoto = useCallback(
+    (file: File) => {
       revokePhoto(photoUrl)
       setPhotoFile(file)
       setPhotoUrl(URL.createObjectURL(file))
@@ -33,13 +31,16 @@ export function useCaptureFlow() {
     [photoUrl, revokePhoto],
   )
 
+  const closeCamera = useCallback(() => {
+    setView('idle')
+  }, [])
+
   const retake = useCallback(() => {
     revokePhoto(photoUrl)
     setPhotoUrl(null)
     setPhotoFile(null)
     setAnalysis(null)
-    setView('idle')
-    setTimeout(() => fileInputRef.current?.click(), 200)
+    setView('camera')
   }, [photoUrl, revokePhoto])
 
   const send = useCallback(async () => {
@@ -50,12 +51,16 @@ export function useCaptureFlow() {
 
     if (result.ok) {
       setAnalysis(result.data)
-      recordSubmission(result.data, photoUrl ?? undefined)
+      const persistedPhoto = await fileToDataUrl(photoFile)
+      await recordSubmission(result.data, {
+        photoUrl: persistedPhoto,
+        position: positionRef.current,
+      })
       setView('success')
     } else {
       setView('error')
     }
-  }, [photoFile, photoUrl, recordSubmission])
+  }, [photoFile, recordSubmission])
 
   const backToMap = useCallback(() => {
     revokePhoto(photoUrl)
@@ -70,17 +75,16 @@ export function useCaptureFlow() {
     setPhotoUrl(null)
     setPhotoFile(null)
     setAnalysis(null)
-    setView('idle')
-    setTimeout(() => fileInputRef.current?.click(), 300)
+    setView('camera')
   }, [photoUrl, revokePhoto])
 
   return {
     view,
     photoUrl,
     analysis,
-    fileInputRef,
     openCamera,
-    handleFileChange,
+    setPhoto,
+    closeCamera,
     retake,
     send,
     backToMap,

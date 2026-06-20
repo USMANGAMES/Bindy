@@ -32,10 +32,10 @@ export function ProcessingOverlay() {
           transition={{ delay: 0.2 }}
           className="text-lg font-semibold text-bindy-text"
         >
-          Bindy AI is analyzing the photo...
+          Bindy AI rasmni tahlil qilmoqda...
         </motion.h2>
         <p className="mt-2 max-w-xs text-sm text-gray-500">
-          Identifying bin type, material, and location
+          Bin yoki trash ekanini aniqlash
         </p>
 
         <div className="mt-8 flex gap-2">

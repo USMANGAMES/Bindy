@@ -1,6 +1,14 @@
-export type AppTab = 'map' | 'leaderboard' | 'profile'
+export type AppTab = 'map' | 'shop' | 'leaderboard' | 'profile'
 
-export type CaptureView = 'idle' | 'preview' | 'processing' | 'success' | 'error'
+export type CaptureView =
+  | 'idle'
+  | 'camera'
+  | 'preview'
+  | 'processing'
+  | 'success'
+  | 'error'
+
+export type ReportCategory = 'bin' | 'trash'
 
 export type BinType = 'plastic' | 'glass' | 'paper' | 'mixed' | 'organic'
 
@@ -13,6 +21,7 @@ export type RecyclingBin = {
   fillLevel: number
   verified: boolean
   distance?: number
+  distanceM?: number
 }
 
 export type BinAnalysis = {
@@ -20,14 +29,34 @@ export type BinAnalysis = {
   confidence: number
   points: number
   label: string
+  category: ReportCategory
 }
 
 export type Submission = {
   id: string
   type: BinType
+  category: ReportCategory
   points: number
   createdAt: string
   photoUrl?: string
+  lat?: number
+  lng?: number
+  label?: string
+}
+
+/** Map marker target — bin or user report */
+export type MapTarget = {
+  id: string
+  lat: number
+  lng: number
+  name: string
+  distanceM?: number
+}
+
+export type RouteResult = {
+  coordinates: [number, number][]
+  distanceM: number
+  durationMin: number
 }
 
 export type LeaderboardEntry = {
@@ -39,12 +68,44 @@ export type LeaderboardEntry = {
   isYou?: boolean
 }
 
+export type SharedReport = {
+  id: string
+  lat: number
+  lng: number
+  category: ReportCategory
+  type: BinType
+  label: string
+  photoUrl?: string
+  userName: string
+  createdAt: string
+  points: number
+  distanceM?: number
+}
+
+export type ShopProduct = {
+  id: string
+  brand: string
+  name: string
+  description: string
+  discountPercent: number
+  pointsCost: number
+  emoji: string
+  color: string
+}
+
+export type RedeemedCoupon = {
+  productId: string
+  code: string
+  redeemedAt: string
+}
+
 export type UserProfile = {
   name: string
   points: number
   binsReported: number
   streak: number
   submissions: Submission[]
+  redeemedCoupons: RedeemedCoupon[]
 }
 
 export type AppState = {

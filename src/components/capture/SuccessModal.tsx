@@ -49,8 +49,10 @@ export function SuccessModal({ analysis, onBackToMap }: SuccessModalProps) {
           <Check className="h-14 w-14 text-bindy-mint" strokeWidth={3} />
         </motion.div>
 
-        <h2 className="text-2xl font-bold text-white">Bin recognized!</h2>
-        <p className="mt-2 text-white/85">+{analysis.points} eco points earned</p>
+        <h2 className="text-2xl font-bold text-white">
+          {analysis.category === 'bin' ? 'Quti aniqlandi!' : 'Musor joyi qayd etildi!'}
+        </h2>
+        <p className="mt-2 text-white/85">+{analysis.points} eco ball</p>
 
         <motion.div
           initial={{ y: 20, opacity: 0 }}
@@ -59,8 +61,13 @@ export function SuccessModal({ analysis, onBackToMap }: SuccessModalProps) {
           className="mt-8 w-full rounded-3xl bg-white/15 p-5 backdrop-blur-md"
         >
           <div className="flex items-center gap-4">
-            <span className="text-4xl">{BIN_TYPE_EMOJI[analysis.type]}</span>
+            <span className="text-4xl">
+              {analysis.category === 'bin' ? BIN_TYPE_EMOJI[analysis.type] : '🗑️'}
+            </span>
             <div className="text-left">
+              <p className="text-xs font-semibold uppercase tracking-wider text-white/70">
+                {analysis.category === 'bin' ? 'Bin' : 'Trash'}
+              </p>
               <p className="font-bold text-white">{analysis.label}</p>
               <p className="mt-0.5 flex items-center gap-1 text-sm text-white/80">
                 <Sparkles className="h-3.5 w-3.5" />

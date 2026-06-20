@@ -35,7 +35,7 @@ export function InstallPrompt() {
         initial={{ y: 80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 80, opacity: 0 }}
-        className="fixed inset-x-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[600] mx-auto max-w-lg"
+        className="fixed inset-x-4 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-[600] mx-auto max-w-lg"
       >
         <div className="flex items-center gap-3 rounded-3xl bg-bindy-charcoal p-4 text-white shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-bindy-mint">

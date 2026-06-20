@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Leaf } from 'lucide-react'
+import { BindyLogoMark } from '../brand/BindyLogo'
 
 type SplashScreenProps = {
   onStart: () => void
@@ -13,14 +13,14 @@ export function SplashScreen({ onStart }: SplashScreenProps) {
       exit={{ opacity: 0, scale: 1.05 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="flex-1 flex flex-col items-center justify-center text-center">
+      <div className="flex flex-1 flex-col items-center justify-center text-center">
         <motion.div
           initial={{ scale: 0, rotate: -20 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ type: 'spring', stiffness: 200, damping: 18, delay: 0.1 }}
-          className="mb-8 flex h-24 w-24 items-center justify-center rounded-[2rem] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.15)]"
+          className="mb-8"
         >
-          <Leaf className="h-12 w-12 text-bindy-mint" strokeWidth={2.5} />
+          <BindyLogoMark className="h-28 w-28" />
         </motion.div>
 
         <motion.h1
@@ -65,7 +65,7 @@ export function SplashScreen({ onStart }: SplashScreenProps) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.7 }}
         whileTap={{ scale: 0.97 }}
-        className="w-full max-w-sm rounded-3xl bg-white py-4.5 py-4 text-base font-semibold text-bindy-mint shadow-[0_12px_40px_rgba(0,0,0,0.15)]"
+        className="w-full max-w-sm rounded-3xl bg-white py-4 text-base font-semibold text-bindy-mint shadow-[0_12px_40px_rgba(0,0,0,0.15)]"
       >
         Get started
       </motion.button>

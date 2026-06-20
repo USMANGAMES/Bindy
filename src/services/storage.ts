@@ -11,6 +11,7 @@ const DEFAULT_STATE: AppState = {
     binsReported: 17,
     streak: 5,
     submissions: [],
+    redeemedCoupons: [],
   },
 }
 
@@ -18,7 +19,20 @@ export function loadState(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...DEFAULT_STATE }
-    return { ...DEFAULT_STATE, ...JSON.parse(raw) }
+    const parsed = JSON.parse(raw) as AppState
+    return {
+      ...DEFAULT_STATE,
+      ...parsed,
+      profile: {
+        ...DEFAULT_STATE.profile,
+        ...parsed.profile,
+        submissions: (parsed.profile?.submissions ?? []).map((s) => ({
+          ...s,
+          category: s.category ?? 'bin',
+        })),
+        redeemedCoupons: parsed.profile?.redeemedCoupons ?? [],
+      },
+    }
   } catch {
     return { ...DEFAULT_STATE }
   }

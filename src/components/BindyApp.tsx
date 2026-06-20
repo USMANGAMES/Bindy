@@ -2,12 +2,15 @@ import { useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import type { AppTab } from '../types'
 import { useApp } from '../context/AppContext'
+import { useGeolocation } from '../hooks/useGeolocation'
 import { useCaptureFlow } from '../hooks/useCaptureFlow'
 import { SplashScreen } from './splash/SplashScreen'
 import { BottomNav } from './layout/BottomNav'
 import { MapScreen } from './screens/MapScreen'
 import { LeaderboardScreen } from './screens/LeaderboardScreen'
 import { ProfileScreen } from './screens/ProfileScreen'
+import { CoinShopScreen } from './screens/CoinShopScreen'
+import { CameraCaptureModal } from './capture/CameraCaptureModal'
 import { PhotoPreviewModal } from './capture/PhotoPreviewModal'
 import { ProcessingOverlay } from './capture/ProcessingOverlay'
 import { SuccessModal } from './capture/SuccessModal'
@@ -16,11 +19,16 @@ import { InstallPrompt } from './InstallPrompt'
 
 export function BindyApp() {
   const { state, completeSplash } = useApp()
+  const { position } = useGeolocation()
   const [tab, setTab] = useState<AppTab>('map')
-  const capture = useCaptureFlow()
+  const capture = useCaptureFlow(position)
 
   const showSplash = !state.hasSeenSplash
-  const captureFullscreen = capture.view === 'processing' || capture.view === 'success' || capture.view === 'error'
+  const captureFullscreen =
+    capture.view === 'camera' ||
+    capture.view === 'processing' ||
+    capture.view === 'success' ||
+    capture.view === 'error'
 
   return (
     <>
@@ -30,27 +38,30 @@ export function BindyApp() {
 
       {!showSplash && (
         <div className="relative mx-auto flex h-full min-h-[100dvh] w-full max-w-lg flex-col overflow-hidden bg-bindy-bg sm:max-w-xl md:shadow-2xl lg:max-w-md">
-          <input
-            ref={capture.fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={capture.handleFileChange}
-          />
-
           <main className="relative flex flex-1 flex-col overflow-hidden">
-            {tab === 'map' && (
-              <MapScreen onCapture={capture.openCamera} captureHidden={capture.isActive} />
-            )}
+            {tab === 'map' && <MapScreen />}
+            {tab === 'shop' && <CoinShopScreen />}
             {tab === 'leaderboard' && <LeaderboardScreen />}
             {tab === 'profile' && <ProfileScreen />}
           </main>
 
-          <BottomNav active={tab} onChange={setTab} hidden={captureFullscreen} />
+          <BottomNav
+            active={tab}
+            onChange={setTab}
+            onCapture={capture.openCamera}
+            captureDisabled={capture.isActive}
+            hidden={captureFullscreen}
+          />
           <InstallPrompt />
 
           <AnimatePresence>
+            {capture.view === 'camera' && (
+              <CameraCaptureModal
+                key="camera"
+                onCapture={capture.setPhoto}
+                onClose={capture.closeCamera}
+              />
+            )}
             {capture.view === 'preview' && capture.photoUrl && (
               <PhotoPreviewModal
                 key="preview"

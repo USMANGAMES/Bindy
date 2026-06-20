@@ -7,9 +7,10 @@ type BinDetailSheetProps = {
   bin: RecyclingBin | null
   onClose: () => void
   onNavigate: () => void
+  navigating?: boolean
 }
 
-export function BinDetailSheet({ bin, onClose, onNavigate }: BinDetailSheetProps) {
+export function BinDetailSheet({ bin, onClose, onNavigate, navigating }: BinDetailSheetProps) {
   return (
     <AnimatePresence>
       {bin && (
@@ -59,9 +60,13 @@ export function BinDetailSheet({ bin, onClose, onNavigate }: BinDetailSheetProps
                 </div>
               </div>
               <div className="rounded-3xl bg-bindy-bg p-4">
-                <p className="text-xs font-medium text-gray-500">Distance</p>
+                <p className="text-xs font-medium text-gray-500">Masofa</p>
                 <p className="mt-1 text-xl font-bold text-bindy-text">
-                  {bin.distance != null ? `${Math.round(bin.distance * 1000)}m` : '—'}
+                  {bin.distanceM != null
+                    ? `${bin.distanceM} m`
+                    : bin.distance != null
+                      ? `${Math.round(bin.distance * 1000)} m`
+                      : '—'}
                 </p>
                 {bin.verified && (
                   <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-bindy-mint">
@@ -75,10 +80,11 @@ export function BinDetailSheet({ bin, onClose, onNavigate }: BinDetailSheetProps
             <button
               type="button"
               onClick={onNavigate}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-3xl bg-bindy-charcoal py-4 text-sm font-semibold text-white transition active:scale-[0.98]"
+              disabled={navigating}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-3xl bg-bindy-charcoal py-4 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-60"
             >
               <Navigation className="h-4 w-4" />
-              Get directions
+              {navigating ? 'Yo‘l chizilmoqda...' : 'Yo‘nalish olish'}
             </button>
           </motion.div>
         </>
