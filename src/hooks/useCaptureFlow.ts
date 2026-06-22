@@ -10,6 +10,7 @@ export function useCaptureFlow(userPosition: [number, number]) {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [analysis, setAnalysis] = useState<BinAnalysis | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | undefined>()
   const positionRef = useRef(userPosition)
   positionRef.current = userPosition
 
@@ -40,6 +41,7 @@ export function useCaptureFlow(userPosition: [number, number]) {
     setPhotoUrl(null)
     setPhotoFile(null)
     setAnalysis(null)
+    setErrorMessage(undefined)
     setView('camera')
   }, [photoUrl, revokePhoto])
 
@@ -51,6 +53,7 @@ export function useCaptureFlow(userPosition: [number, number]) {
 
     if (result.ok) {
       setAnalysis(result.data)
+      setErrorMessage(undefined)
       const persistedPhoto = await fileToDataUrl(photoFile)
       await recordSubmission(result.data, {
         photoUrl: persistedPhoto,
@@ -58,6 +61,7 @@ export function useCaptureFlow(userPosition: [number, number]) {
       })
       setView('success')
     } else {
+      setErrorMessage(result.error)
       setView('error')
     }
   }, [photoFile, recordSubmission])
@@ -75,6 +79,7 @@ export function useCaptureFlow(userPosition: [number, number]) {
     setPhotoUrl(null)
     setPhotoFile(null)
     setAnalysis(null)
+    setErrorMessage(undefined)
     setView('camera')
   }, [photoUrl, revokePhoto])
 
@@ -82,6 +87,7 @@ export function useCaptureFlow(userPosition: [number, number]) {
     view,
     photoUrl,
     analysis,
+    errorMessage,
     openCamera,
     setPhoto,
     closeCamera,

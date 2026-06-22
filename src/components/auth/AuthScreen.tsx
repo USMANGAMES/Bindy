@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import { ShieldCheck } from 'lucide-react'
 import { BindyLogoMark } from '../brand/BindyLogo'
 import { BRANDING } from '../../config/branding'
 import { useAuth } from '../../context/AuthContext'
@@ -12,12 +13,21 @@ export function AuthScreen() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [notBot, setNotBot] = useState(false)
+  const [honeypot, setHoneypot] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    if (honeypot) return
+
+    if (!notBot) {
+      setError('Davom etish uchun "Men robot emasman" ni belgilang')
+      return
+    }
 
     const name = username.trim()
     if (name.length < 3) {
@@ -66,6 +76,7 @@ export function AuthScreen() {
               onClick={() => {
                 setMode(m)
                 setError(null)
+                setNotBot(false)
               }}
               className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition ${
                 mode === m ? 'bg-white text-bindy-text shadow-sm' : 'text-gray-500'
@@ -77,6 +88,18 @@ export function AuthScreen() {
         </div>
 
         <form onSubmit={submit} className="space-y-4 rounded-3xl bg-white p-6 shadow-soft">
+          {/* Botlar to‘ldiradigan yashirin maydon — odamlar ko‘rmaydi */}
+          <input
+            type="text"
+            name="website"
+            value={honeypot}
+            onChange={(e) => setHoneypot(e.target.value)}
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden
+            className="pointer-events-none absolute h-0 w-0 opacity-0"
+          />
+
           <div>
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
               Username
@@ -120,6 +143,30 @@ export function AuthScreen() {
             </div>
           )}
 
+          <label
+            className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 transition ${
+              notBot
+                ? 'border-bindy-mint/40 bg-bindy-mint/5'
+                : 'border-gray-200 bg-bindy-bg hover:border-gray-300'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={notBot}
+              onChange={(e) => setNotBot(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-bindy-mint focus:ring-bindy-mint"
+            />
+            <ShieldCheck
+              className={`h-5 w-5 shrink-0 ${notBot ? 'text-bindy-mint' : 'text-gray-400'}`}
+            />
+            <span className="text-sm font-medium text-bindy-text">
+              Men robot emasman
+              <span className="mt-0.5 block text-xs font-normal text-gray-500">
+                Haqiqiy {BRANDING.appName} ilovasidasiz
+              </span>
+            </span>
+          </label>
+
           {error && (
             <p className="rounded-2xl bg-red-50 px-4 py-2.5 text-center text-sm text-red-600">
               {error}
@@ -128,7 +175,7 @@ export function AuthScreen() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !notBot}
             className="w-full rounded-3xl bg-bindy-mint py-4 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(16,185,129,0.35)] disabled:opacity-60"
           >
             {loading ? 'Kutilmoqda...' : mode === 'login' ? 'Kirish' : 'Ro‘yxatdan o‘tish'}

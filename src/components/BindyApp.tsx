@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import type { AppTab } from '../types'
 import { useApp } from '../context/AppContext'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { useCaptureFlow } from '../hooks/useCaptureFlow'
+import { fetchAiStatus } from '../services/aiService'
 import { SplashScreen } from './splash/SplashScreen'
 import { BottomNav } from './layout/BottomNav'
 import { MapScreen } from './screens/MapScreen'
@@ -22,6 +23,10 @@ export function BindyApp() {
   const { position } = useGeolocation()
   const [tab, setTab] = useState<AppTab>('map')
   const capture = useCaptureFlow(position)
+
+  useEffect(() => {
+    fetchAiStatus()
+  }, [])
 
   const showSplash = !state.hasSeenSplash
   const captureFullscreen =
@@ -79,7 +84,11 @@ export function BindyApp() {
               />
             )}
             {capture.view === 'error' && (
-              <ErrorModal key="error" onTryAgain={capture.tryAgain} />
+              <ErrorModal
+                key="error"
+                message={capture.errorMessage}
+                onTryAgain={capture.tryAgain}
+              />
             )}
           </AnimatePresence>
         </div>

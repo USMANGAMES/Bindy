@@ -1,15 +1,12 @@
 import type { BinType, ReportCategory, SharedReport } from '../types'
 import { API_ENABLED } from '../config/env'
 import { apiFetch } from './apiClient'
-import { authHeaders } from './authHeaders'
 
 /** GET /api/v1/reports — barcha foydalanuvchilar reportlari */
 export async function fetchSharedReports(): Promise<SharedReport[]> {
   if (!API_ENABLED) return []
   try {
-    const data = await apiFetch<{ reports: SharedReport[] }>('/api/v1/reports', {
-      headers: authHeaders(),
-    })
+    const data = await apiFetch<{ reports: SharedReport[] }>('/api/v1/reports')
     return data.reports ?? []
   } catch (e) {
     console.warn('[bindy] shared reports fetch failed', e)
@@ -34,7 +31,7 @@ export async function publishReport(payload: CreateReportPayload): Promise<Share
   try {
     const data = await apiFetch<{ report: SharedReport }>('/api/v1/reports', {
       method: 'POST',
-      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
     return data.report ?? null

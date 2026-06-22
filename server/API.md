@@ -21,7 +21,12 @@ Register → JS obyektga yoziladi. Login → shu ro‘yxatdan qidiriladi.
 
 ---
 
-## 1. AI tahlil — Gemma
+## 1. AI tahlil — Gemma4 (Alem AI)
+
+**POST** `/api/v1/analyze`
+
+Server `server/gemma.py` orqali Alem API ga murojaat qiladi.
+Kalit: `server/.env` → `GEMMA_API_KEY` (frontendga qo‘ymang).
 
 **POST** `/api/v1/analyze`
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { useNearbyBins } from '../../hooks/useNearbyBins'
@@ -7,6 +7,7 @@ import { useNavigation } from '../../hooks/useNavigation'
 import { BindyMap } from '../map/BindyMap'
 import { MapHeader } from '../map/MapHeader'
 import { MapControls } from '../map/MapControls'
+import { MapCategoryFilter, type MapLayerFilter } from '../map/MapCategoryFilter'
 import { BinDetailSheet } from '../map/BinDetailSheet'
 import { CommunityReportSheet } from '../map/CommunityReportSheet'
 import { NearbyBinsPanel } from '../map/NearbyBinsPanel'
@@ -22,8 +23,26 @@ export function MapScreen() {
   const nav = useNavigation(position)
   const [selectedBin, setSelectedBin] = useState<RecyclingBin | null>(null)
   const [selectedReport, setSelectedReport] = useState<CommunityReport | null>(null)
+  const [layerFilter, setLayerFilter] = useState<MapLayerFilter>({ bin: true, trash: true })
+
+  const visibleTrash = layerFilter.trash ? community.trash : []
+  const visibleCommunityBins = layerFilter.bin ? community.bins : []
+  const visibleSeedBins = layerFilter.bin ? nearbyBins : []
+
+  useEffect(() => {
+    if (selectedReport?.category === 'trash' && !layerFilter.trash) {
+      setSelectedReport(null)
+    }
+    if (selectedReport?.category === 'bin' && !layerFilter.bin) {
+      setSelectedReport(null)
+    }
+    if (selectedBin && !layerFilter.bin) {
+      setSelectedBin(null)
+    }
+  }, [layerFilter, selectedReport, selectedBin])
 
   const handleSelectSeedBin = (bin: RecyclingBin) => {
+    if (!layerFilter.bin) return
     setSelectedReport(null)
     const fromList = nearbyBins.find((b) => b.id === bin.id)
     setSelectedBin(
@@ -35,6 +54,8 @@ export function MapScreen() {
   }
 
   const handleSelectReport = (report: CommunityReport) => {
+    if (report.category === 'trash' && !layerFilter.trash) return
+    if (report.category === 'bin' && !layerFilter.bin) return
     setSelectedBin(null)
     setSelectedReport(report)
   }
@@ -62,8 +83,9 @@ export function MapScreen() {
     <div className="relative h-full flex-1">
       <BindyMap
         userPosition={position}
-        communityTrash={community.trash}
-        communityBins={community.bins}
+        communityTrash={visibleTrash}
+        communityBins={visibleCommunityBins}
+        showSeedBins={layerFilter.bin}
         selectedBinId={selectedBin?.id ?? null}
         selectedReportId={selectedReport?.id ?? null}
         navigationTargetId={nav.destination?.id ?? null}
@@ -74,6 +96,7 @@ export function MapScreen() {
       />
       <MapHeader />
       <MapControls onLocate={refresh} loading={loading} />
+      <MapCategoryFilter filter={layerFilter} onChange={setLayerFilter} />
 
       <AnimatePresence>
         {nav.isNavigating && nav.destination && (
@@ -90,9 +113,10 @@ export function MapScreen() {
 
       {!nav.isNavigating && (
         <NearbyBinsPanel
-          bins={nearbyBins}
-          communityTrash={community.trash}
-          communityBins={community.bins}
+          bins={visibleSeedBins}
+          communityTrash={visibleTrash}
+          communityBins={visibleCommunityBins}
+          layerFilter={layerFilter}
           selectedBinId={selectedBin?.id ?? null}
           selectedReportId={selectedReport?.id ?? null}
           onSelectBin={handleSelectSeedBin}

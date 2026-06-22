@@ -41,10 +41,14 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     strictPort: false,
-    // Tailscale / LAN — barcha host nomlariga ruxsat
     allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
     hmr: {
-      // Tailscale orqali kirganda HMR ishlashi uchun
       clientPort: 5173,
     },
   },

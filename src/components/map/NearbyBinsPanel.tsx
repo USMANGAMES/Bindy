@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronRight, MapPin, Users, X } from 'lucide-react'
 import { formatDistanceMeters } from '../../utils/geo'
 import { BIN_TYPE_EMOJI } from '../../data/bins'
+import type { MapLayerFilter } from './MapCategoryFilter'
 import type { NearbyBin } from '../../hooks/useNearbyBins'
 import type { CommunityReport } from '../../hooks/useCommunityReports'
 
@@ -12,6 +13,7 @@ type NearbyBinsPanelProps = {
   bins: NearbyBin[]
   communityTrash: CommunityReport[]
   communityBins: CommunityReport[]
+  layerFilter: MapLayerFilter
   selectedBinId: string | null
   selectedReportId: string | null
   onSelectBin: (bin: NearbyBin) => void
@@ -22,6 +24,7 @@ export function NearbyBinsPanel({
   bins,
   communityTrash,
   communityBins,
+  layerFilter,
   selectedBinId,
   selectedReportId,
   onSelectBin,
@@ -31,7 +34,13 @@ export function NearbyBinsPanel({
     () => sessionStorage.getItem(DISMISS_KEY) === '1',
   )
 
-  const community = [...communityTrash, ...communityBins].slice(0, 8)
+  const community = [
+    ...(layerFilter.trash ? communityTrash : []),
+    ...(layerFilter.bin ? communityBins : []),
+  ]
+    .sort((a, b) => a.distanceM - b.distanceM)
+    .slice(0, 8)
+
   const totalCount = community.length + bins.length
 
   const dismiss = () => {
@@ -66,6 +75,8 @@ export function NearbyBinsPanel({
     )
   }
 
+  const showCommunitySection = layerFilter.bin || layerFilter.trash
+
   return (
     <div className="pointer-events-none absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom))] left-4 right-4 z-[500]">
       <AnimatePresence>
@@ -84,7 +95,7 @@ export function NearbyBinsPanel({
             <X className="h-4 w-4" />
           </button>
 
-          {community.length > 0 && (
+          {showCommunitySection && (
             <div className="border-b border-gray-100">
               <div className="px-4 pb-3 pt-3 pr-12">
                 <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-bindy-accent">
@@ -92,76 +103,111 @@ export function NearbyBinsPanel({
                   Jamoa reportlari
                 </p>
                 <p className="mt-0.5 text-sm font-bold text-bindy-text">
-                  {communityTrash.length} trash · {communityBins.length} bin
+                  {layerFilter.trash && (
+                    <span className={layerFilter.trash ? 'text-bindy-accent' : 'text-gray-300'}>
+                      {communityTrash.length} trash
+                    </span>
+                  )}
+                  {layerFilter.trash && layerFilter.bin && ' · '}
+                  {layerFilter.bin && (
+                    <span className={layerFilter.bin ? 'text-bindy-mint' : 'text-gray-300'}>
+                      {communityBins.length} bin
+                    </span>
+                  )}
+                  {!layerFilter.trash && !layerFilter.bin && 'Filter yoqilmagan'}
                 </p>
               </div>
-              <ul className="px-2 pb-2">
-                {community.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelectReport(item)}
-                      className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition ${
-                        selectedReportId === item.id ? 'bg-bindy-accent/10' : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className="text-lg">{item.category === 'trash' ? '🗑️' : '♻️'}</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-bindy-text">{item.label}</p>
-                        <p className="truncate text-xs text-gray-400">{item.userName}</p>
-                      </div>
-                      <span
-                        className={`flex shrink-0 items-center gap-0.5 text-sm font-bold ${item.category === 'trash' ? 'text-bindy-accent' : 'text-bindy-mint'}`}
+              {community.length > 0 ? (
+                <ul className="px-2 pb-2">
+                  {community.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => onSelectReport(item)}
+                        className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition ${
+                          selectedReportId === item.id ? 'bg-bindy-accent/10' : 'hover:bg-gray-50'
+                        }`}
                       >
-                        <MapPin className="h-3.5 w-3.5" />
-                        {formatDistanceMeters(item.distanceM)}
-                      </span>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-gray-300" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                        <span className="text-lg">{item.category === 'trash' ? '🗑️' : '♻️'}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-bindy-text">{item.label}</p>
+                          <p className="truncate text-xs text-gray-400">{item.userName}</p>
+                        </div>
+                        <span
+                          className={`flex shrink-0 items-center gap-0.5 text-sm font-bold ${item.category === 'trash' ? 'text-bindy-accent' : 'text-bindy-mint'}`}
+                        >
+                          <MapPin className="h-3.5 w-3.5" />
+                          {formatDistanceMeters(item.distanceM)}
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-gray-300" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="px-4 pb-3 text-sm text-gray-500">
+                  {layerFilter.trash && layerFilter.bin
+                    ? 'Hozircha report yo‘q'
+                    : layerFilter.trash
+                      ? 'Trash report yo‘q'
+                      : layerFilter.bin
+                        ? 'Bin report yo‘q'
+                        : 'Filter tanlang'}
+                </p>
+              )}
             </div>
           )}
 
-          <div className="px-4 py-3 pr-12">
-            <p className="text-xs font-semibold uppercase tracking-wider text-bindy-mint">Yaqin binlar</p>
-            <p className="mt-0.5 text-sm font-bold text-bindy-text">
-              {bins.length > 0
-                ? `${bins.length} ta · eng yaqini ${formatDistanceMeters(bins[0].distanceM)}`
-                : '1 km ichida bin yo‘q'}
+          {layerFilter.bin && (
+            <>
+              <div className="px-4 py-3 pr-12">
+                <p className="text-xs font-semibold uppercase tracking-wider text-bindy-mint">Yaqin binlar</p>
+                <p className="mt-0.5 text-sm font-bold text-bindy-text">
+                  {bins.length > 0
+                    ? `${bins.length} ta · eng yaqini ${formatDistanceMeters(bins[0].distanceM)}`
+                    : '1 km ichida bin yo‘q'}
+                </p>
+              </div>
+
+              {bins.length > 0 && (
+                <ul className="max-h-36 overflow-y-auto px-2 pb-2">
+                  {bins.slice(0, 5).map((bin) => (
+                    <li key={bin.id}>
+                      <button
+                        type="button"
+                        onClick={() => onSelectBin(bin)}
+                        className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition ${
+                          selectedBinId === bin.id ? 'bg-bindy-mint/10' : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="text-lg">{BIN_TYPE_EMOJI[bin.type]}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-bindy-text">{bin.name}</p>
+                        </div>
+                        <span className="flex shrink-0 items-center gap-0.5 text-sm font-bold text-bindy-mint">
+                          <MapPin className="h-3.5 w-3.5" />
+                          {formatDistanceMeters(bin.distanceM)}
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-gray-300" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+
+          {!layerFilter.bin && !layerFilter.trash && (
+            <p className="px-4 py-6 text-center text-sm text-gray-500">
+              O‘ngdagi filter tugmasini bosing (Bin / Trash)
             </p>
-          </div>
-
-          {bins.length > 0 && (
-            <ul className="max-h-36 overflow-y-auto px-2 pb-2">
-              {bins.slice(0, 5).map((bin) => (
-                <li key={bin.id}>
-                  <button
-                    type="button"
-                    onClick={() => onSelectBin(bin)}
-                    className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition ${
-                      selectedBinId === bin.id ? 'bg-bindy-mint/10' : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="text-lg">{BIN_TYPE_EMOJI[bin.type]}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-bindy-text">{bin.name}</p>
-                    </div>
-                    <span className="flex shrink-0 items-center gap-0.5 text-sm font-bold text-bindy-mint">
-                      <MapPin className="h-3.5 w-3.5" />
-                      {formatDistanceMeters(bin.distanceM)}
-                    </span>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-gray-300" />
-                  </button>
-                </li>
-              ))}
-            </ul>
           )}
 
-          {community.length === 0 && bins.length === 0 && (
-            <p className="px-4 pb-4 text-sm text-gray-500">Hozircha yaqin atrofda joy yo‘q</p>
-          )}
+          {layerFilter.trash &&
+            !layerFilter.bin &&
+            community.length === 0 && (
+              <p className="px-4 pb-4 text-sm text-gray-500">Trash report yo‘q</p>
+            )}
         </motion.div>
       </AnimatePresence>
     </div>

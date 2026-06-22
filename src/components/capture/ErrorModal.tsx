@@ -2,10 +2,11 @@ import { motion } from 'framer-motion'
 import { AlertTriangle } from 'lucide-react'
 
 type ErrorModalProps = {
+  message?: string
   onTryAgain: () => void
 }
 
-export function ErrorModal({ onTryAgain }: ErrorModalProps) {
+export function ErrorModal({ message, onTryAgain }: ErrorModalProps) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -25,10 +26,11 @@ export function ErrorModal({ onTryAgain }: ErrorModalProps) {
         </div>
 
         <h2 className="text-center text-xl font-bold text-bindy-text">
-          AI couldn&apos;t recognize a bin
+          Tanib bo‘lmadi
         </h2>
         <p className="mt-3 text-center text-sm leading-relaxed text-gray-500">
-          Please try again with a clearer photo. Make sure the bin is fully visible and well lit.
+          {message ??
+            'Faqat ko‘cha qutisi, katta konteyner yoki katta musor to‘plami. Ofis/uy ichidagi qutilar va 1 ta parcha musor qabul qilinmaydi.'}
         </p>
 
         <button
@@ -36,7 +38,7 @@ export function ErrorModal({ onTryAgain }: ErrorModalProps) {
           onClick={onTryAgain}
           className="mt-8 w-full rounded-3xl bg-bindy-charcoal py-4 text-sm font-semibold text-white transition-all active:scale-[0.98]"
         >
-          Try again
+          Qayta urinish
         </button>
       </motion.div>
     </motion.div>

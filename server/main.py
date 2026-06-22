@@ -1,27 +1,53 @@
-import random
-import uuid
-from fastapi import FastAPI, UploadFile, File
+import logging
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from store import list_reports, add_report
+
+from gemma import ai_status, analyze_image, is_gemma_configured
+from store import add_report, list_reports
+
+load_dotenv(Path(__file__).parent / ".env")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger("bindy")
 
 app = FastAPI(title="Bindy API")
 
-origins = [
-    o.strip()
-    for o in __import__("os").getenv(
-        "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
-    ).split(",")
-    if o.strip()
-]
-
+# localhost, LAN, Tailscale — barcha manzillar (dev uchun)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    origin = request.headers.get("origin", "-")
+    log.info(">>> %s %s  origin=%s", request.method, request.url.path, origin)
+    response = await call_next(request)
+    log.info("<<< %s %s -> %s", request.method, request.url.path, response.status_code)
+    return response
+
+
+@app.on_event("startup")
+def startup():
+    status = ai_status()
+    if status["configured"]:
+        log.info("Gemma4 AI YOQILGAN — model=%s, provider=%s", status["model"], status["provider"])
+    else:
+        log.warning("Gemma4 AI O'CHIQ — server/.env da GEMMA_API_KEY yo'q")
+    log.info("CORS: barcha originlar ruxsat (dev rejim)")
 
 
 class ReportBody(BaseModel):
@@ -35,6 +61,11 @@ class ReportBody(BaseModel):
     points: int
 
 
+@app.get("/api/v1/ai/status")
+def get_ai_status():
+    return ai_status()
+
+
 @app.get("/api/v1/reports")
 def get_reports():
     return {"reports": list_reports()}
@@ -43,46 +74,40 @@ def get_reports():
 @app.post("/api/v1/reports")
 def create_report(body: ReportBody):
     report = add_report(body.model_dump())
+    log.info("Report saqlandi: %s (%s) @ %.4f, %.4f", body.userName, body.category, body.lat, body.lng)
     return {"report": report}
-
-
-TYPES = ["plastic", "glass", "paper", "mixed", "organic"]
-LABELS = {
-    "plastic": "Plastic & PET",
-    "glass": "Glass",
-    "paper": "Paper & Cardboard",
-    "mixed": "Mixed Recycling",
-    "organic": "Organic Waste",
-}
 
 
 @app.post("/api/v1/analyze")
 async def analyze(image: UploadFile = File(...)):
+    filename = image.filename or "photo.jpg"
+    log.info("--- /api/v1/analyze: %s ---", filename)
+
+    if not is_gemma_configured():
+        log.error("Tahlil rad etildi: AI sozlanmagan")
+        return {"ok": False, "error": "AI sozlanmagan — server/.env da GEMMA_API_KEY qo'ying"}
+
     data = await image.read()
-    if len(data) < 8000 and random.random() > 0.2:
-        return {"ok": False}
+    if len(data) < 1000:
+        log.warning("Tahlil rad etildi: rasm juda kichik (%s bayt)", len(data))
+        return {"ok": False, "error": "Rasm juda kichik"}
 
-    category = "trash" if random.random() < 0.35 else "bin"
-    if category == "trash":
-        return {
-            "ok": True,
-            "category": "trash",
-            "type": "mixed",
-            "confidence": random.randint(82, 96),
-            "label": "Noqonuniy musor joyi",
-        }
+    result, reject_reason = analyze_image(data, image.content_type)
+    if not result:
+        msg = reject_reason or "Gemma tahlil qila olmadi"
+        log.error("Tahlil RAD ETILDI: %s", msg)
+        return {"ok": False, "error": msg}
 
-    t = random.choice(TYPES)
-    return {
-        "ok": True,
-        "category": "bin",
-        "type": t,
-        "confidence": random.randint(88, 98),
-        "label": LABELS[t],
-    }
+    log.info("Tahlil MUVAFFAQIYATLI: %s / %s", result["category"], result["type"])
+    return {"ok": True, **result}
 
 
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=int(__import__("os").getenv("PORT", "8000")), reload=True)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "8000")),
+        reload=True,
+    )

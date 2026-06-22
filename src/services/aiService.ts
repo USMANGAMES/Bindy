@@ -1,125 +1,179 @@
-import type { BinAnalysis, ReportCategory } from '../types'
+import type { BinAnalysis, ReportCategory, BinSizeClass } from '../types'
 import { BIN_TYPE_LABELS } from '../data/bins'
-import { pointsForCategory } from '../constants/points'
-import { API_ENABLED } from '../config/env'
-import { getStoredToken } from './authService'
+import { calcBinPoints, calcTrashPoints } from '../constants/points'
+import { API_ENABLED, API_URL } from '../config/env'
 
 const TYPES = ['plastic', 'glass', 'paper', 'mixed', 'organic'] as const
+const BIN_SIZES = ['street', 'wheel', 'large'] as const
+const LOG = '[bindy AI]'
 
-function hashFile(file: File): number {
-  return file.size + file.lastModified + file.name.length
+export type AiStatus = {
+  configured: boolean
+  provider: string
+  model: string
+  endpoint: string
 }
 
-/** AI o‘zi bin yoki trash ekanini aniqlaydi */
+export async function fetchAiStatus(): Promise<AiStatus | null> {
+  if (!API_ENABLED) {
+    console.warn(`${LOG} Server ulanmagan — mock rejim`)
+    return null
+  }
+  try {
+    const res = await fetch(`${API_URL}/api/v1/ai/status`)
+    if (!res.ok) return null
+    const status = (await res.json()) as AiStatus
+    if (status.configured) {
+      console.info(`${LOG} Gemma4 yoqilgan — ${status.model} (${status.provider})`)
+    } else {
+      console.warn(`${LOG} Gemma4 o'chiq — server/.env da GEMMA_API_KEY yo'q`)
+    }
+    return status
+  } catch {
+    console.error(`${LOG} Serverga ulanib bo'lmadi — ${API_URL}`)
+    return null
+  }
+}
+
 export async function analyzeBinPhoto(
   file: File,
-): Promise<{ ok: true; data: BinAnalysis } | { ok: false }> {
+): Promise<{ ok: true; data: BinAnalysis } | { ok: false; error?: string }> {
   if (API_ENABLED) {
-    const remote = await analyzeViaBackend(file)
-    if (remote) return remote
+    console.info(`${LOG} Serverga yuborilmoqda (${(file.size / 1024).toFixed(1)} KB)...`)
+    return analyzeViaBackend(file)
   }
+  console.warn(`${LOG} Mock rejim — VITE_API_URL yo'q`)
   return analyzeMock(file)
 }
 
-/** POST /api/v1/analyze — Gemma category ni o‘zi qaytaradi */
 async function analyzeViaBackend(
   file: File,
-): Promise<{ ok: true; data: BinAnalysis } | { ok: false } | null> {
+): Promise<{ ok: true; data: BinAnalysis } | { ok: false; error?: string }> {
+  const started = performance.now()
   try {
     const form = new FormData()
     form.append('image', file)
 
-    const token = getStoredToken()
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/analyze`, {
+    const res = await fetch(`${API_URL}/api/v1/analyze`, {
       method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: form,
     })
 
-    if (!res.ok) return null
-
+    const elapsed = ((performance.now() - started) / 1000).toFixed(1)
     const body = (await res.json()) as {
       ok: boolean
       category?: ReportCategory
       type?: string
+      binSize?: BinSizeClass
       confidence?: number
       label?: string
+      points?: number
+      error?: string
     }
 
-    if (!body.ok || !body.category) return { ok: false }
+    console.info(`${LOG} Server javob (${elapsed}s, HTTP ${res.status}):`, body)
+
+    if (!res.ok || !body.ok || !body.category) {
+      const err = body.error ?? 'Bin yoki musor topilmadi'
+      console.error(`${LOG} Rad etildi:`, err)
+      return { ok: false, error: err }
+    }
 
     const category = body.category
     const type = (TYPES.includes(body.type as (typeof TYPES)[number])
       ? body.type
       : 'mixed') as BinAnalysis['type']
 
-    return {
-      ok: true,
-      data: {
-        type,
-        confidence: body.confidence ?? 90,
-        points: pointsForCategory(category),
-        label:
-          body.label ??
-          (category === 'trash' ? 'Noqonuniy musor joyi' : BIN_TYPE_LABELS[type]),
-        category,
-      },
+    const binSize =
+      body.binSize && BIN_SIZES.includes(body.binSize) ? body.binSize : undefined
+
+    const points =
+      body.points ??
+      (category === 'trash'
+        ? calcTrashPoints()
+        : calcBinPoints(binSize ?? 'street', body.confidence ?? 78))
+
+    const data: BinAnalysis = {
+      type,
+      confidence: body.confidence ?? 90,
+      points,
+      label:
+        body.label ??
+        (category === 'trash' ? 'Noqonuniy musor to‘plami' : BIN_TYPE_LABELS[type]),
+      category,
+      ...(binSize ? { binSize } : {}),
     }
+
+    console.info(
+      `${LOG} MUVAFFAQIYAT — ${category}, +${data.points} ball${binSize ? ` (${binSize})` : ''}`,
+    )
+    return { ok: true, data }
   } catch (e) {
-    console.warn('[bindy] Gemma analyze failed, falling back to mock', e)
-    return null
+    const elapsed = ((performance.now() - started) / 1000).toFixed(1)
+    console.error(`${LOG} Ulanish xato (${elapsed}s):`, e)
+    return { ok: false, error: 'Serverga ulanib bo\'lmadi' }
   }
+}
+
+function hashFile(file: File): number {
+  return file.size + file.lastModified + file.name.length
 }
 
 async function analyzeMock(
   file: File,
-): Promise<{ ok: true; data: BinAnalysis } | { ok: false }> {
+): Promise<{ ok: true; data: BinAnalysis } | { ok: false; error?: string }> {
+  console.info(`${LOG} Mock tahlil boshlandi...`)
   await delay(2400 + Math.random() * 800)
 
   const hash = hashFile(file)
-  const category: ReportCategory = hash % 3 === 0 ? 'trash' : 'bin'
-  const points = pointsForCategory(category)
+  const roll = hash % 10
 
-  if (file.size < 8_000) {
-    return Math.random() > 0.15 ? fail() : buildResult(hash, category, points)
+  if (file.size < 8_000 && Math.random() > 0.15) {
+    return fail()
   }
-
-  return Math.random() > 0.15 ? buildResult(hash, category, points) : fail()
+  if (Math.random() > 0.15) {
+    if (roll === 0) return buildTrashResult(hash)
+    return buildBinResult(hash, roll)
+  }
+  return fail()
 }
 
-function buildResult(
-  seed: number,
-  category: ReportCategory,
-  points: number,
-): { ok: true; data: BinAnalysis } {
-  if (category === 'trash') {
-    return {
-      ok: true,
-      data: {
-        type: 'mixed',
-        confidence: 82 + (seed % 14),
-        points,
-        label: 'Noqonuniy musor joyi',
-        category: 'trash',
-      },
-    }
+function buildTrashResult(seed: number): { ok: true; data: BinAnalysis } {
+  return {
+    ok: true,
+    data: {
+      type: 'mixed',
+      confidence: 82 + (seed % 14),
+      points: calcTrashPoints(),
+      label: 'Noqonuniy musor to‘plami',
+      category: 'trash',
+    },
   }
+}
 
+function buildBinResult(
+  seed: number,
+  roll: number,
+): { ok: true; data: BinAnalysis } {
+  const binSize: BinSizeClass = roll <= 5 ? 'street' : roll <= 8 ? 'wheel' : 'large'
   const type = TYPES[seed % TYPES.length]
+  const confidence = 78 + (seed % 18)
   return {
     ok: true,
     data: {
       type,
-      confidence: 88 + (seed % 11),
-      points,
+      binSize,
+      confidence,
+      points: calcBinPoints(binSize, confidence),
       label: BIN_TYPE_LABELS[type],
       category: 'bin',
     },
   }
 }
 
-function fail(): { ok: false } {
-  return { ok: false }
+function fail(msg?: string): { ok: false; error?: string } {
+  console.warn(`${LOG} Mock: tahlil muvaffaqiyatsiz`)
+  return { ok: false, error: msg }
 }
 
 function delay(ms: number) {

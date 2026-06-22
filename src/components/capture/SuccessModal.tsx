@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { Check, Sparkles } from 'lucide-react'
 import type { BinAnalysis } from '../../types'
 import { BIN_TYPE_EMOJI } from '../../data/bins'
+import { BIN_SIZE_LABELS } from '../../constants/points'
 
 type SuccessModalProps = {
   analysis: BinAnalysis
@@ -53,6 +54,12 @@ export function SuccessModal({ analysis, onBackToMap }: SuccessModalProps) {
           {analysis.category === 'bin' ? 'Quti aniqlandi!' : 'Musor joyi qayd etildi!'}
         </h2>
         <p className="mt-2 text-white/85">+{analysis.points} eco ball</p>
+        {analysis.category === 'bin' && analysis.binSize && (
+          <p className="mt-1 text-sm text-white/70">{BIN_SIZE_LABELS[analysis.binSize]}</p>
+        )}
+        {analysis.category === 'trash' && (
+          <p className="mt-1 text-sm text-white/70">Katta musor to‘plami — nadir!</p>
+        )}
 
         <motion.div
           initial={{ y: 20, opacity: 0 }}

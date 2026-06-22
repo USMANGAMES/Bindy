@@ -10,6 +10,8 @@ export type CaptureView =
 
 export type ReportCategory = 'bin' | 'trash'
 
+export type BinSizeClass = 'street' | 'wheel' | 'large'
+
 export type BinType = 'plastic' | 'glass' | 'paper' | 'mixed' | 'organic'
 
 export type RecyclingBin = {
@@ -30,6 +32,7 @@ export type BinAnalysis = {
   points: number
   label: string
   category: ReportCategory
+  binSize?: BinSizeClass
 }
 
 export type Submission = {

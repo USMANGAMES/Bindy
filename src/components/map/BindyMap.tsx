@@ -111,6 +111,7 @@ type BindyMapProps = {
   userPosition: [number, number]
   communityTrash: CommunityReport[]
   communityBins: CommunityReport[]
+  showSeedBins?: boolean
   selectedBinId: string | null
   selectedReportId: string | null
   navigationTargetId: string | null
@@ -124,6 +125,7 @@ export function BindyMap({
   userPosition,
   communityTrash,
   communityBins,
+  showSeedBins = true,
   selectedBinId,
   selectedReportId,
   navigationTargetId,
@@ -170,17 +172,18 @@ export function BindyMap({
         <NavigationFollow userPosition={userPosition} active={isNavigating} />
         <Marker position={userPosition} icon={userIcon} zIndexOffset={1000} />
 
-        {seedBins.map((bin) => (
-          <Marker
-            key={bin.id}
-            position={[bin.lat, bin.lng]}
-            icon={createBinIcon(
-              bin.id === selectedBinId,
-              bin.id === navigationTargetId && isNavigating,
-            )}
-            eventHandlers={{ click: () => onSelectSeedBin(bin) }}
-          />
-        ))}
+        {showSeedBins &&
+          seedBins.map((bin) => (
+            <Marker
+              key={bin.id}
+              position={[bin.lat, bin.lng]}
+              icon={createBinIcon(
+                bin.id === selectedBinId,
+                bin.id === navigationTargetId && isNavigating,
+              )}
+              eventHandlers={{ click: () => onSelectSeedBin(bin) }}
+            />
+          ))}
 
         {communityBins.map((report) => (
           <Marker
