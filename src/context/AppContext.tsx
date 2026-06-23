@@ -7,21 +7,49 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { AppState, BinAnalysis, SharedReport, Submission } from '../types'
+import type {
+  AppState,
+  BinAnalysis,
+  BindyNotification,
+  LeaderboardUser,
+  LiveSnapshot,
+  MapStats,
+  SharedReport,
+  Submission,
+} from '../types'
 import { loadState, markSplashSeen, saveState } from '../services/storage'
 import { fetchSharedReports, publishReport } from '../services/reportsService'
+import { fetchNotifications } from '../services/notificationsService'
+import { pingServer, setServerOnline } from '../services/serverHealth'
+import { fetchHiddenIds, hideMapItemLocal, loadLocalHiddenIds, setLocalHiddenIds } from '../services/hiddenItemsService'
+import { subscribeRealtime } from '../services/realtimeService'
+import {
+  mergeUserProfile,
+  pushPendingReports,
+  syncProfileToServer,
+} from '../services/profileSyncService'
 import { SHOP_PRODUCTS } from '../data/shop'
 
 type AppContextValue = {
   state: AppState
   sharedReports: SharedReport[]
+  notifications: BindyNotification[]
+  unreadCount: number
+  hiddenItemIds: Set<string>
+  mapStats: MapStats | null
+  leaderboard: { totalUsers: number; top: LeaderboardUser[] } | null
+  realtimeConnected: boolean
   refreshSharedReports: () => Promise<void>
+  refreshNotifications: () => Promise<void>
+  refreshHiddenItems: () => Promise<void>
+  applyHiddenItem: (id: string) => void
   completeSplash: () => void
   recordSubmission: (
     analysis: BinAnalysis,
     options?: { photoUrl?: string; position?: [number, number] },
   ) => Promise<void>
   updateName: (name: string) => void
+  syncPointsFromServer: () => Promise<void>
   redeemProduct: (productId: string) => { ok: true; code: string } | { ok: false; reason: string }
 }
 
@@ -50,6 +78,69 @@ export function AppProvider({
     return loaded
   })
   const [sharedReports, setSharedReports] = useState<SharedReport[]>([])
+  const [notifications, setNotifications] = useState<BindyNotification[]>([])
+  const [hiddenItemIds, setHiddenItemIds] = useState<Set<string>>(
+    () => new Set(loadLocalHiddenIds()),
+  )
+  const [mapStats, setMapStats] = useState<MapStats | null>(null)
+  const [leaderboard, setLeaderboard] = useState<{
+    totalUsers: number
+    top: LeaderboardUser[]
+  } | null>(null)
+  const [realtimeConnected, setRealtimeConnected] = useState(false)
+
+  const refreshHiddenItems = useCallback(async () => {
+    const ids = await fetchHiddenIds()
+    setHiddenItemIds(new Set(ids))
+  }, [])
+
+  const applyHiddenItem = useCallback((id: string) => {
+    hideMapItemLocal(id)
+    setHiddenItemIds((prev) => new Set([...prev, id]))
+    setSharedReports((prev) => prev.filter((r) => r.id !== id))
+  }, [])
+
+  const persistProfile = useCallback(
+    async (profile = loadState().profile) => {
+      await syncProfileToServer(username, profile)
+    },
+    [username],
+  )
+
+  const handleServerSnapshot = useCallback(
+    async (snapshot: LiveSnapshot) => {
+      setLocalHiddenIds(snapshot.hiddenIds)
+      setHiddenItemIds(new Set(snapshot.hiddenIds))
+      setMapStats(snapshot.stats)
+      setNotifications(snapshot.notifications)
+      setLeaderboard(snapshot.leaderboard)
+
+      const current = loadState()
+      const mergedProfile = mergeUserProfile(current.profile, snapshot.userProfile)
+      const hidden = new Set(snapshot.hiddenIds)
+
+      const { reports, idMap } = await pushPendingReports(
+        username,
+        mergedProfile.submissions,
+        snapshot.reports,
+        hidden,
+      )
+
+      if (idMap.size > 0) {
+        mergedProfile.submissions = mergedProfile.submissions.map((s) =>
+          idMap.has(s.id) ? { ...s, id: idMap.get(s.id)! } : s,
+        )
+      }
+
+      const nextState: AppState = { ...current, profile: mergedProfile }
+      saveState(nextState)
+      setState(nextState)
+      setSharedReports(reports)
+
+      await syncProfileToServer(username, mergedProfile)
+    },
+    [username],
+  )
 
   useEffect(() => {
     setState((prev) => {
@@ -65,11 +156,94 @@ export function AppProvider({
     setSharedReports(reports)
   }, [])
 
+  const syncPointsFromServer = useCallback(async () => {
+    /* points sync via realtime user.stats_updated */
+  }, [])
+
+  const refreshNotifications = useCallback(async () => {
+    const list = await fetchNotifications(username)
+    setNotifications(list)
+  }, [username])
+
+  const applySnapshotToState = useCallback(
+    (snapshot: LiveSnapshot) => {
+      void handleServerSnapshot(snapshot)
+    },
+    [handleServerSnapshot],
+  )
+
   useEffect(() => {
-    refreshSharedReports()
-    const id = setInterval(refreshSharedReports, 30_000)
-    return () => clearInterval(id)
-  }, [refreshSharedReports])
+    let cancelled = false
+
+    async function bootOffline() {
+      await pingServer()
+      if (cancelled) return
+      refreshSharedReports()
+      refreshNotifications()
+      refreshHiddenItems()
+    }
+
+    bootOffline()
+
+    const unsub = subscribeRealtime(username, {
+      onConnected: () => {
+        setServerOnline(true)
+        setRealtimeConnected(true)
+      },
+      onDisconnected: () => {
+        setRealtimeConnected(false)
+        pingServer()
+      },
+      onSnapshot: applySnapshotToState,
+      onStatsUpdated: setMapStats,
+      onReportCreated: (report) => {
+        setSharedReports((prev) => [report, ...prev.filter((r) => r.id !== report.id)])
+      },
+      onReportDeleted: (id) => {
+        applyHiddenItem(id)
+      },
+      onHiddenItemAdded: (itemId) => {
+        applyHiddenItem(itemId)
+      },
+      onNotificationCreated: (note) => {
+        setNotifications((prev) => [note, ...prev.filter((n) => n.id !== note.id)])
+      },
+      onNotificationsRead: () => {
+        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+      },
+      onUserStatsUpdated: (stats) => {
+        setState((prev) => {
+          const points = Math.max(prev.profile.points, stats.points)
+          if (prev.profile.points === points) return prev
+          const next = { ...prev, profile: { ...prev.profile, points } }
+          saveState(next)
+          return next
+        })
+      },
+      onUserProfileUpdated: (profile) => {
+        setState((prev) => {
+          const merged = mergeUserProfile(prev.profile, profile)
+          const next = { ...prev, profile: merged }
+          saveState(next)
+          return next
+        })
+      },
+      onLeaderboardUpdated: setLeaderboard,
+    })
+
+    return () => {
+      cancelled = true
+      unsub()
+      setRealtimeConnected(false)
+    }
+  }, [
+    username,
+    applySnapshotToState,
+    applyHiddenItem,
+    refreshSharedReports,
+    refreshNotifications,
+    refreshHiddenItems,
+  ])
 
   const completeSplash = useCallback(() => {
     setState((s) => markSplashSeen(s))
@@ -82,10 +256,8 @@ export function AppProvider({
     ) => {
       const [lat, lng] = options?.position ?? []
       const submissionId = crypto.randomUUID()
-      let userName = 'Eco Hero'
 
       setState((prev) => {
-        userName = prev.profile.name
         const submission: Submission = {
           id: submissionId,
           type: analysis.type,
@@ -109,6 +281,7 @@ export function AppProvider({
           },
         }
         saveState(next)
+        void syncProfileToServer(username, next.profile)
         return next
       })
 
@@ -120,17 +293,36 @@ export function AppProvider({
           type: analysis.type,
           label: analysis.label,
           photoUrl: options?.photoUrl,
-          userName,
+          userName: username,
           points: analysis.points,
         })
         if (published) {
-          setSharedReports((prev) => [published, ...prev.filter((r) => r.id !== published.id)])
+          setState((prev) => {
+            const next = {
+              ...prev,
+              profile: {
+                ...prev.profile,
+                submissions: prev.profile.submissions.map((s) =>
+                  s.id === submissionId ? { ...s, id: published.id } : s,
+                ),
+              },
+            }
+            saveState(next)
+            void syncProfileToServer(username, next.profile)
+            return next
+          })
+          if (!realtimeConnected) {
+            setSharedReports((prev) => [published, ...prev.filter((r) => r.id !== published.id)])
+          }
         }
-        await refreshSharedReports()
       }
     },
-    [refreshSharedReports],
+    [realtimeConnected, username],
   )
+
+  useEffect(() => {
+    void persistProfile()
+  }, [username, persistProfile])
 
   const updateName = useCallback((name: string) => {
     setState((prev) => {
@@ -175,31 +367,51 @@ export function AppProvider({
         }
         saveState(next)
         result = { ok: true, code }
+        void syncProfileToServer(username, next.profile)
         return next
       })
 
       return result
     },
-    [],
+    [username],
   )
 
   const value = useMemo(
     () => ({
       state,
       sharedReports,
+      notifications,
+      unreadCount: notifications.filter((n) => !n.read).length,
+      hiddenItemIds,
+      mapStats,
+      leaderboard,
+      realtimeConnected,
       refreshSharedReports,
+      refreshNotifications,
+      refreshHiddenItems,
+      applyHiddenItem,
       completeSplash,
       recordSubmission,
       updateName,
+      syncPointsFromServer,
       redeemProduct,
     }),
     [
       state,
       sharedReports,
+      notifications,
+      hiddenItemIds,
+      mapStats,
+      leaderboard,
+      realtimeConnected,
       refreshSharedReports,
+      refreshNotifications,
+      refreshHiddenItems,
+      applyHiddenItem,
       completeSplash,
       recordSubmission,
       updateName,
+      syncPointsFromServer,
       redeemProduct,
     ],
   )

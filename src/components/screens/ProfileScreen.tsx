@@ -1,12 +1,12 @@
 import { motion } from 'framer-motion'
-import { Flame, Leaf, LogOut, Recycle, Star } from 'lucide-react'
+import { Flame, Leaf, LogOut, Recycle, Shield, Star } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { useAuth } from '../../context/AuthContext'
 import { BIN_TYPE_EMOJI, BIN_TYPE_LABELS } from '../../data/bins'
 
 export function ProfileScreen() {
   const { state } = useApp()
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin } = useAuth()
   const { profile } = state
 
   const stats = [
@@ -34,6 +34,11 @@ export function ProfileScreen() {
             <div className="min-w-0 flex-1">
               <h2 className="text-xl font-bold">{profile.name}</h2>
               <p className="text-sm text-white/70">@{user?.username ?? profile.name}</p>
+              {isAdmin && (
+                <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-yellow-200">
+                  <Shield className="h-3 w-3" /> Admin
+                </p>
+              )}
             </div>
             <Leaf className="h-8 w-8 text-white/40" />
           </div>

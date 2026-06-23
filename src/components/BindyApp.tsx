@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { useCaptureFlow } from '../hooks/useCaptureFlow'
 import { fetchAiStatus } from '../services/aiService'
+import { pingServer } from '../services/serverHealth'
 import { SplashScreen } from './splash/SplashScreen'
 import { BottomNav } from './layout/BottomNav'
 import { MapScreen } from './screens/MapScreen'
@@ -25,7 +26,7 @@ export function BindyApp() {
   const capture = useCaptureFlow(position)
 
   useEffect(() => {
-    fetchAiStatus()
+    pingServer().then(() => fetchAiStatus())
   }, [])
 
   const showSplash = !state.hasSeenSplash

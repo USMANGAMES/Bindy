@@ -1,0 +1,19 @@
+{
+  "Khafizov": {
+    "username": "Khafizov",
+    "points": 0,
+    "reports": 0,
+    "createdAt": "2026-06-23T13:45:13Z"
+  },
+  "Ibrohim": {
+    "username": "Ibrohim",
+    "points": 0,
+    "reports": 17,
+    "createdAt": "2026-06-23T13:55:21Z",
+    "binsReported": 17,
+    "streak": 5,
+    "submissions": [],
+    "redeemedCoupons": [],
+    "updatedAt": "2026-06-23T14:05:02Z"
+  }
+}

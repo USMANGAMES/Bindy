@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { AuthUser } from '../services/authService'
+import { isAdminUsername } from '../config/admins'
 import {
   clearAuth,
   getStoredUser,
@@ -19,6 +20,7 @@ import {
 
 type AuthContextValue = {
   user: AuthUser | null
+  isAdmin: boolean
   loading: boolean
   login: (username: string, password: string) => Promise<string | null>
   register: (username: string, password: string) => Promise<string | null>
@@ -30,6 +32,11 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(getStoredUser)
   const [loading, setLoading] = useState(true)
+
+  const isAdmin = useMemo(
+    () => (user ? isAdminUsername(user.username) : false),
+    [user],
+  )
 
   useEffect(() => {
     setUser(verifySession())
@@ -58,8 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, loading, login, register, logout }),
-    [user, loading, login, register, logout],
+    () => ({ user, isAdmin, loading, login, register, logout }),
+    [user, isAdmin, loading, login, register, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

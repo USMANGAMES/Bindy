@@ -116,3 +116,52 @@ export type AppState = {
   hasSeenSplash: boolean
   profile: UserProfile
 }
+
+export type BindyNotification = {
+  id: string
+  type: 'report_deleted' | string
+  title: string
+  message: string
+  reason?: string
+  pointsDelta: number
+  reportLabel?: string
+  category?: ReportCategory
+  adminUser?: string
+  createdAt: string
+  read: boolean
+}
+
+export type LeaderboardUser = {
+  username: string
+  points: number
+  reports: number
+}
+
+export type MapStats = {
+  totalBins: number
+  seedBins: number
+  communityBins: number
+  trashReports: number
+  totalReports: number
+  totalUsers: number
+}
+
+export type LiveSnapshot = {
+  stats: MapStats
+  reports: SharedReport[]
+  hiddenIds: string[]
+  leaderboard: { totalUsers: number; top: LeaderboardUser[] }
+  notifications: BindyNotification[]
+  userStats?: { username: string; points: number; reports: number } | null
+  userProfile?: ServerUserProfile | null
+}
+
+export type ServerUserProfile = {
+  username: string
+  points: number
+  reports: number
+  binsReported?: number
+  streak?: number
+  submissions?: Submission[]
+  redeemedCoupons?: RedeemedCoupon[]
+}

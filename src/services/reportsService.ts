@@ -1,10 +1,11 @@
 import type { BinType, ReportCategory, SharedReport } from '../types'
 import { API_ENABLED } from '../config/env'
+import { isServerOnline } from './serverHealth'
 import { apiFetch } from './apiClient'
 
 /** GET /api/v1/reports — barcha foydalanuvchilar reportlari */
 export async function fetchSharedReports(): Promise<SharedReport[]> {
-  if (!API_ENABLED) return []
+  if (!API_ENABLED || !isServerOnline()) return []
   try {
     const data = await apiFetch<{ reports: SharedReport[] }>('/api/v1/reports')
     return data.reports ?? []
@@ -27,7 +28,7 @@ export type CreateReportPayload = {
 
 /** POST /api/v1/reports — boshqalarga ko‘rinsin */
 export async function publishReport(payload: CreateReportPayload): Promise<SharedReport | null> {
-  if (!API_ENABLED) return null
+  if (!API_ENABLED || !isServerOnline()) return null
   try {
     const data = await apiFetch<{ report: SharedReport }>('/api/v1/reports', {
       method: 'POST',

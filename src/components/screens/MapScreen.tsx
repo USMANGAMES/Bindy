@@ -8,22 +8,38 @@ import { BindyMap } from '../map/BindyMap'
 import { MapHeader } from '../map/MapHeader'
 import { MapControls } from '../map/MapControls'
 import { MapCategoryFilter, type MapLayerFilter } from '../map/MapCategoryFilter'
+import { MapAlertsSheet } from '../map/MapAlertsSheet'
 import { BinDetailSheet } from '../map/BinDetailSheet'
 import { CommunityReportSheet } from '../map/CommunityReportSheet'
 import { NearbyBinsPanel } from '../map/NearbyBinsPanel'
 import { NavigationPanel } from '../map/NavigationPanel'
+import { useApp } from '../../context/AppContext'
+import { useAuth } from '../../context/AuthContext'
+import { isAdminUsername } from '../../config/admins'
 import { haversineMeters } from '../../utils/geo'
 import type { RecyclingBin } from '../../types'
 import type { CommunityReport } from '../../hooks/useCommunityReports'
 
 export function MapScreen() {
+  const {
+    refreshSharedReports,
+    notifications,
+    unreadCount,
+    refreshNotifications,
+    hiddenItemIds,
+    applyHiddenItem,
+    refreshHiddenItems,
+  } = useApp()
+  const { user } = useAuth()
+  const adminUser = user && isAdminUsername(user.username) ? user.username : undefined
   const { position, loading, refresh } = useGeolocation()
-  const nearbyBins = useNearbyBins(position, 1)
+  const nearbyBins = useNearbyBins(position, 1, hiddenItemIds)
   const community = useCommunityReports(position)
   const nav = useNavigation(position)
   const [selectedBin, setSelectedBin] = useState<RecyclingBin | null>(null)
   const [selectedReport, setSelectedReport] = useState<CommunityReport | null>(null)
   const [layerFilter, setLayerFilter] = useState<MapLayerFilter>({ bin: true, trash: true })
+  const [alertsOpen, setAlertsOpen] = useState(false)
 
   const visibleTrash = layerFilter.trash ? community.trash : []
   const visibleCommunityBins = layerFilter.bin ? community.bins : []
@@ -79,6 +95,12 @@ export function MapScreen() {
     await nav.startNavigation(target)
   }
 
+  const handleItemDeleted = (id: string) => {
+    applyHiddenItem(id)
+    refreshHiddenItems()
+    refreshSharedReports()
+  }
+
   return (
     <div className="relative h-full flex-1">
       <BindyMap
@@ -93,10 +115,16 @@ export function MapScreen() {
         isNavigating={nav.isNavigating}
         onSelectSeedBin={handleSelectSeedBin}
         onSelectReport={handleSelectReport}
+        hiddenItemIds={hiddenItemIds}
       />
       <MapHeader />
       <MapControls onLocate={refresh} loading={loading} />
-      <MapCategoryFilter filter={layerFilter} onChange={setLayerFilter} />
+      <MapCategoryFilter
+        filter={layerFilter}
+        onChange={setLayerFilter}
+        unreadCount={unreadCount}
+        onOpenAlerts={() => setAlertsOpen(true)}
+      />
 
       <AnimatePresence>
         {nav.isNavigating && nav.destination && (
@@ -126,15 +154,35 @@ export function MapScreen() {
 
       <BinDetailSheet
         bin={selectedBin}
+        adminUser={adminUser}
         onClose={() => setSelectedBin(null)}
         onNavigate={handleNavigateBin}
+        onDeleted={() => {
+          if (selectedBin) handleItemDeleted(selectedBin.id)
+          setSelectedBin(null)
+        }}
         navigating={nav.loading}
       />
 
+      {user && (
+        <MapAlertsSheet
+          open={alertsOpen}
+          notifications={notifications}
+          username={user.username}
+          onClose={() => setAlertsOpen(false)}
+          onRefresh={refreshNotifications}
+        />
+      )}
+
       <CommunityReportSheet
         report={selectedReport}
+        adminUser={adminUser}
         onClose={() => setSelectedReport(null)}
         onNavigate={handleNavigateReport}
+        onDeleted={() => {
+          if (selectedReport) handleItemDeleted(selectedReport.id)
+          setSelectedReport(null)
+        }}
         navigating={nav.loading}
       />
     </div>

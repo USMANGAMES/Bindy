@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Layers } from 'lucide-react'
+import { Bell, Layers } from 'lucide-react'
 
 export type MapLayerFilter = {
   bin: boolean
@@ -10,16 +10,23 @@ export type MapLayerFilter = {
 type MapCategoryFilterProps = {
   filter: MapLayerFilter
   onChange: (next: MapLayerFilter) => void
+  unreadCount?: number
+  onOpenAlerts: () => void
 }
 
-export function MapCategoryFilter({ filter, onChange }: MapCategoryFilterProps) {
+export function MapCategoryFilter({
+  filter,
+  onChange,
+  unreadCount = 0,
+  onOpenAlerts,
+}: MapCategoryFilterProps) {
   const [open, setOpen] = useState(false)
 
   const toggle = (key: keyof MapLayerFilter) => {
     onChange({ ...filter, [key]: !filter[key] })
   }
 
-  const activeCount = (filter.bin ? 1 : 0) + (filter.trash ? 1 : 0)
+  const filterActive = (filter.bin ? 1 : 0) + (filter.trash ? 1 : 0)
 
   return (
     <div className="absolute right-4 top-[calc(max(0.75rem,env(safe-area-inset-top))+8.5rem)] z-[600] flex flex-col items-end gap-2">
@@ -28,15 +35,30 @@ export function MapCategoryFilter({ filter, onChange }: MapCategoryFilterProps) 
         onClick={() => setOpen((v) => !v)}
         whileTap={{ scale: 0.95 }}
         aria-expanded={open}
-        aria-label="Bin / Trash filter"
+        aria-label="Filter"
         className={`relative flex h-12 w-12 items-center justify-center rounded-2xl shadow-soft backdrop-blur-md transition ${
           open ? 'bg-bindy-mint text-white' : 'bg-white/95 text-bindy-text hover:bg-gray-50'
         }`}
       >
         <Layers className="h-5 w-5" strokeWidth={2} />
-        {activeCount > 0 && !open && (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-bindy-accent px-1 text-[10px] font-bold text-white">
-            {activeCount}
+        {filterActive > 0 && filterActive < 2 && !open && (
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-bindy-mint px-1 text-[10px] font-bold text-white">
+            {filterActive}
+          </span>
+        )}
+      </motion.button>
+
+      <motion.button
+        type="button"
+        onClick={onOpenAlerts}
+        whileTap={{ scale: 0.95 }}
+        aria-label="Alerts"
+        className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white/95 text-bindy-text shadow-soft backdrop-blur-md transition hover:bg-gray-50"
+      >
+        <Bell className="h-5 w-5 text-bindy-mint" strokeWidth={2} />
+        {unreadCount > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </motion.button>

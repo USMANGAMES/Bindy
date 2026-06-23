@@ -119,6 +119,7 @@ type BindyMapProps = {
   isNavigating: boolean
   onSelectSeedBin: (bin: RecyclingBin) => void
   onSelectReport: (report: CommunityReport) => void
+  hiddenItemIds?: Set<string>
 }
 
 export function BindyMap({
@@ -133,13 +134,15 @@ export function BindyMap({
   isNavigating,
   onSelectSeedBin,
   onSelectReport,
+  hiddenItemIds,
 }: BindyMapProps) {
   const seedBins = useMemo(() => {
-    return SEED_BINS.map((bin) => ({
+    return SEED_BINS.filter((bin) => !hiddenItemIds?.has(bin.id))
+      .map((bin) => ({
       ...bin,
       distanceM: Math.round(haversineKm(userPosition[0], userPosition[1], bin.lat, bin.lng) * 1000),
     }))
-  }, [userPosition])
+  }, [userPosition, hiddenItemIds])
 
   const flyToTarget = useMemo(() => {
     if (selectedReportId) {

@@ -2,6 +2,7 @@ import type { BinAnalysis, ReportCategory, BinSizeClass } from '../types'
 import { BIN_TYPE_LABELS } from '../data/bins'
 import { calcBinPoints, calcTrashPoints } from '../constants/points'
 import { API_ENABLED, API_URL } from '../config/env'
+import { isServerOnline, pingServer } from './serverHealth'
 
 const TYPES = ['plastic', 'glass', 'paper', 'mixed', 'organic'] as const
 const BIN_SIZES = ['street', 'wheel', 'large'] as const
@@ -17,6 +18,10 @@ export type AiStatus = {
 export async function fetchAiStatus(): Promise<AiStatus | null> {
   if (!API_ENABLED) {
     console.warn(`${LOG} Server ulanmagan — mock rejim`)
+    return null
+  }
+  if (!isServerOnline() && !(await pingServer())) {
+    console.warn(`${LOG} Server ishlamayapti — mock rejim`)
     return null
   }
   try {
@@ -38,7 +43,7 @@ export async function fetchAiStatus(): Promise<AiStatus | null> {
 export async function analyzeBinPhoto(
   file: File,
 ): Promise<{ ok: true; data: BinAnalysis } | { ok: false; error?: string }> {
-  if (API_ENABLED) {
+  if (API_ENABLED && isServerOnline()) {
     console.info(`${LOG} Serverga yuborilmoqda (${(file.size / 1024).toFixed(1)} KB)...`)
     return analyzeViaBackend(file)
   }

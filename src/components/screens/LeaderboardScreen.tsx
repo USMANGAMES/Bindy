@@ -1,34 +1,93 @@
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Crown, Medal, Trophy } from 'lucide-react'
+import { Crown, Medal, Shield, Trophy, Users, Wifi } from 'lucide-react'
 import { LEADERBOARD } from '../../data/leaderboard'
 import { useApp } from '../../context/AppContext'
+import { useAuth } from '../../context/AuthContext'
+import type { LeaderboardUser } from '../../types'
 
 const RANK_ICONS = [Crown, Medal, Trophy]
 
-export function LeaderboardScreen() {
-  const { state } = useApp()
+function buildEntries(
+  serverTop: LeaderboardUser[] | null,
+  profileName: string,
+  profilePoints: number,
+  profileReports: number,
+  currentUsername?: string,
+) {
+  if (serverTop && serverTop.length > 0) {
+    return serverTop.map((u, i) => ({
+      rank: i + 1,
+      name: u.username,
+      points: u.points,
+      bins: u.reports,
+      avatar: u.username.slice(0, 2).toUpperCase(),
+      isYou: currentUsername === u.username,
+    }))
+  }
+  const you = {
+    rank: 9,
+    name: profileName,
+    points: profilePoints,
+    bins: profileReports,
+    avatar: profileName.slice(0, 2).toUpperCase(),
+    isYou: true,
+  }
+  return [...LEADERBOARD, you].sort((a, b) => b.points - a.points).map((e, i) => ({ ...e, rank: i + 1 }))
+}
 
-  const entries = useMemo(() => {
-    const you = {
-      rank: 9,
-      name: state.profile.name,
-      points: state.profile.points,
-      bins: state.profile.binsReported,
-      avatar: state.profile.name.slice(0, 2).toUpperCase(),
-      isYou: true,
-    }
-    return [...LEADERBOARD, you].sort((a, b) => b.points - a.points).map((e, i) => ({ ...e, rank: i + 1 }))
-  }, [state.profile])
+export function LeaderboardScreen() {
+  const { state, leaderboard, realtimeConnected } = useApp()
+  const { isAdmin, user } = useAuth()
+
+  const entries = useMemo(
+    () =>
+      buildEntries(
+        leaderboard?.top ?? null,
+        state.profile.name,
+        state.profile.points,
+        state.profile.binsReported,
+        user?.username,
+      ),
+    [leaderboard, state.profile, user?.username],
+  )
+
+  const totalUsers = leaderboard?.totalUsers
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bindy-bg">
       <div className="px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
-        <h1 className="text-2xl font-bold text-bindy-text">Leaderboard</h1>
-        <p className="mt-1 text-sm text-gray-500">Top eco heroes this week</p>
+        <div className="flex items-center gap-2">
+          {isAdmin && <Shield className="h-5 w-5 text-red-500" />}
+          <h1 className="text-2xl font-bold text-bindy-text">
+            {isAdmin ? 'Admin Rank' : 'Leaderboard'}
+          </h1>
+          {realtimeConnected && (
+            <span className="flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold uppercase text-green-600">
+              <Wifi className="h-3 w-3" /> Live
+            </span>
+          )}
+        </div>
+        {totalUsers != null ? (
+          <div className="mt-3 flex items-center gap-2 rounded-2xl bg-white px-4 py-3 shadow-soft">
+            <Users className="h-5 w-5 text-bindy-mint" />
+            <span className="text-sm font-semibold text-bindy-text">
+              Jami foydalanuvchilar:{' '}
+              <span className="text-bindy-mint">{totalUsers}</span>
+            </span>
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-gray-500">Top eco heroes this week</p>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
+        {isAdmin && (
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+            Top 10
+          </p>
+        )}
+
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -76,7 +135,7 @@ export function LeaderboardScreen() {
                     <span className="ml-2 text-xs font-medium text-bindy-mint">You</span>
                   )}
                 </p>
-                <p className="text-xs text-gray-500">{entry.bins} bins reported</p>
+                <p className="text-xs text-gray-500">{entry.bins} report</p>
               </div>
               <span className="text-sm font-bold text-bindy-mint">{entry.points.toLocaleString()}</span>
             </motion.div>

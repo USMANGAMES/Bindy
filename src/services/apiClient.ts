@@ -13,9 +13,8 @@ export async function apiFetch<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
-  if (!API_URL) throw new ApiError('VITE_API_URL sozlanmagan', 0)
-
-  const res = await fetch(`${API_URL}${path}`, {
+  const base = API_URL || ''
+  const res = await fetch(`${base}${path}`, {
     ...options,
     headers: {
       Accept: 'application/json',

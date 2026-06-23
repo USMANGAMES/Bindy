@@ -4,7 +4,7 @@ import { haversineMeters } from '../utils/geo'
 import type { SharedReport } from '../types'
 
 export function useCommunityReports(userPosition: [number, number]) {
-  const { state, sharedReports } = useApp()
+  const { state, sharedReports, hiddenItemIds } = useApp()
 
   return useMemo(() => {
     const localReports: SharedReport[] = state.profile.submissions
@@ -28,6 +28,7 @@ export function useCommunityReports(userPosition: [number, number]) {
     }
 
     const all = [...byId.values()]
+      .filter((r) => !hiddenItemIds.has(r.id))
       .map((r) => ({
         ...r,
         distanceM: haversineMeters(userPosition, [r.lat, r.lng]),
@@ -39,7 +40,7 @@ export function useCommunityReports(userPosition: [number, number]) {
       trash: all.filter((r) => r.category === 'trash'),
       bins: all.filter((r) => r.category === 'bin'),
     }
-  }, [sharedReports, state.profile.submissions, state.profile.name, userPosition])
+  }, [sharedReports, state.profile.submissions, state.profile.name, userPosition, hiddenItemIds])
 }
 
 export type CommunityReport = ReturnType<typeof useCommunityReports>['all'][number]
