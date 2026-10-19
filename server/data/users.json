@@ -15,5 +15,87 @@
     "submissions": [],
     "redeemedCoupons": [],
     "updatedAt": "2026-06-23T14:05:02Z"
+  },
+  "zxsad1212": {
+    "username": "zxsad1212",
+    "points": 340,
+    "reports": 17,
+    "binsReported": 17,
+    "streak": 5,
+    "submissions": [],
+    "redeemedCoupons": [
+      {
+        "productId": "belissimo-15",
+        "code": "BINDY-BELI-8337",
+        "redeemedAt": "2026-07-20T09:46:27.282Z"
+      },
+      {
+        "productId": "dominos-20",
+        "code": "BINDY-DOMI-6004",
+        "redeemedAt": "2026-07-20T09:46:28.887Z"
+      },
+      {
+        "productId": "kfc-10",
+        "code": "BINDY-KFC-6946",
+        "redeemedAt": "2026-07-20T09:46:31.593Z"
+      }
+    ],
+    "createdAt": "2026-07-18T10:38:33Z",
+    "updatedAt": "2026-07-30T20:24:33Z"
+  },
+  "serinaqu": {
+    "username": "serinaqu",
+    "points": 340,
+    "reports": 17,
+    "binsReported": 17,
+    "streak": 5,
+    "submissions": [],
+    "redeemedCoupons": [
+      {
+        "productId": "belissimo-15",
+        "code": "BINDY-BELI-9791",
+        "redeemedAt": "2026-07-20T09:30:41.870Z"
+      }
+    ],
+    "createdAt": "2026-07-20T09:30:30Z",
+    "updatedAt": "2026-07-20T09:30:42Z"
+  },
+  "muxlisa_smd": {
+    "username": "muxlisa_smd",
+    "points": 340,
+    "reports": 17,
+    "binsReported": 17,
+    "streak": 5,
+    "submissions": [],
+    "redeemedCoupons": [
+      {
+        "productId": "belissimo-15",
+        "code": "BINDY-BELI-5397",
+        "redeemedAt": "2026-07-20T09:30:41.869Z"
+      },
+      {
+        "productId": "dominos-20",
+        "code": "BINDY-DOMI-6004",
+        "redeemedAt": "2026-07-20T09:46:28.887Z"
+      },
+      {
+        "productId": "kfc-10",
+        "code": "BINDY-KFC-6946",
+        "redeemedAt": "2026-07-20T09:46:31.593Z"
+      }
+    ],
+    "createdAt": "2026-07-21T18:28:44Z",
+    "updatedAt": "2026-07-21T18:29:53Z"
+  },
+  "zxsad9779@gmail.com": {
+    "username": "zxsad9779@gmail.com",
+    "points": 340,
+    "reports": 17,
+    "binsReported": 17,
+    "streak": 5,
+    "submissions": [],
+    "redeemedCoupons": [],
+    "createdAt": "2026-07-30T20:24:02Z",
+    "updatedAt": "2026-07-30T20:25:36Z"
   }
 }
