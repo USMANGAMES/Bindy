@@ -3,13 +3,13 @@ import type { AppState } from '../types'
 const STORAGE_KEY = 'bindy-app-state'
 
 const DEFAULT_STATE: AppState = {
-  globalBinCount: 1245,
+  globalBinCount: 0,
   hasSeenSplash: false,
   profile: {
     name: 'Eco Hero',
-    points: 340,
-    binsReported: 17,
-    streak: 5,
+    points: 0,
+    binsReported: 0,
+    streak: 0,
     submissions: [],
     redeemedCoupons: [],
   },

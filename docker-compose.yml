@@ -1,0 +1,13 @@
+services:
+  bindy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bindy-app
+    restart: always
+    ports:
+      - "127.0.0.1:8001:8001"
+    env_file:
+      - server/.env
+    volumes:
+      - ./server/data:/app/server/data

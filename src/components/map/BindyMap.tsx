@@ -120,6 +120,16 @@ type BindyMapProps = {
   onSelectSeedBin: (bin: RecyclingBin) => void
   onSelectReport: (report: CommunityReport) => void
   hiddenItemIds?: Set<string>
+  mapStyle?: 'positron' | 'voyager'
+}
+
+export type MapStyle = 'positron' | 'voyager'
+
+const CARTO_KEY = 'cb1_4vg7_1_bd20dcd09a3632fe1b5facb3'
+
+const STYLE_URLS: Record<MapStyle, string> = {
+  positron: `https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`,
+  voyager: `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`,
 }
 
 export function BindyMap({
@@ -135,6 +145,7 @@ export function BindyMap({
   onSelectSeedBin,
   onSelectReport,
   hiddenItemIds,
+  mapStyle = 'positron',
 }: BindyMapProps) {
   const seedBins = useMemo(() => {
     return SEED_BINS.filter((bin) => !hiddenItemIds?.has(bin.id))
@@ -166,7 +177,8 @@ export function BindyMap({
         attributionControl={false}
       >
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          key={mapStyle}
+          url={STYLE_URLS[mapStyle] || STYLE_URLS.positron}
           maxZoom={20}
         />
         <MapController center={userPosition} flyToTarget={flyToTarget} isNavigating={isNavigating} />

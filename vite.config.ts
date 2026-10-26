@@ -44,6 +44,8 @@ export default defineConfig({
     allowedHosts: [
       'localhost',
       '127.0.0.1',
+      'app.bindy.uz',
+      '.bindy.uz',
       'servicehub-server.tail5903af.ts.net',
       '.tail5903af.ts.net',
     ],
@@ -72,6 +74,8 @@ export default defineConfig({
     allowedHosts: [
       'localhost',
       '127.0.0.1',
+      'app.bindy.uz',
+      '.bindy.uz',
       'servicehub-server.tail5903af.ts.net',
       '.tail5903af.ts.net',
     ],

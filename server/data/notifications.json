@@ -1,1 +1,17 @@
-{}
+{
+  "testuser": [
+    {
+      "id": "fde06b57-170e-4b93-8170-706434a23009",
+      "createdAt": "2026-10-26T20:56:58Z",
+      "read": false,
+      "type": "report_deleted",
+      "title": "Report o‘chirildi",
+      "message": "Admin Khafizov sizning bin reportingizni o‘chirdi.",
+      "reason": "Test report deletion during automated verification check",
+      "pointsDelta": -4,
+      "reportLabel": "Test Bin",
+      "category": "bin",
+      "adminUser": "Khafizov"
+    }
+  ]
+}

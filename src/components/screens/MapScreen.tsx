@@ -40,6 +40,17 @@ export function MapScreen() {
   const [selectedReport, setSelectedReport] = useState<CommunityReport | null>(null)
   const [layerFilter, setLayerFilter] = useState<MapLayerFilter>({ bin: true, trash: true })
   const [alertsOpen, setAlertsOpen] = useState(false)
+  const [mapStyle, setMapStyle] = useState<'positron' | 'voyager'>(() => {
+    return (localStorage.getItem('bindy-map-style') as 'positron' | 'voyager') || 'positron'
+  })
+
+  const handleToggleStyle = () => {
+    setMapStyle((prev) => {
+      const next = prev === 'positron' ? 'voyager' : 'positron'
+      localStorage.setItem('bindy-map-style', next)
+      return next
+    })
+  }
 
   const visibleTrash = layerFilter.trash ? community.trash : []
   const visibleCommunityBins = layerFilter.bin ? community.bins : []
@@ -116,9 +127,15 @@ export function MapScreen() {
         onSelectSeedBin={handleSelectSeedBin}
         onSelectReport={handleSelectReport}
         hiddenItemIds={hiddenItemIds}
+        mapStyle={mapStyle}
       />
       <MapHeader />
-      <MapControls onLocate={refresh} loading={loading} />
+      <MapControls
+        onLocate={refresh}
+        loading={loading}
+        mapStyle={mapStyle}
+        onToggleStyle={handleToggleStyle}
+      />
       <MapCategoryFilter
         filter={layerFilter}
         onChange={setLayerFilter}

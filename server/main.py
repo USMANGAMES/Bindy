@@ -6,11 +6,16 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, field_validator
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from admin_config import is_admin
 from gemma import ai_status, analyze_image, is_gemma_configured
+from points import calc_bin_points, calc_trash_points
 from realtime import broadcast, emit_stats, format_sse
 from store import (
     add_report,
@@ -37,11 +42,20 @@ logging.basicConfig(
 )
 log = logging.getLogger("bindy")
 
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Bindy API")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+cors_origins_env = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,https://app.bindy.uz,http://app.bindy.uz",
+)
+cors_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https?://.*",
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -82,7 +96,36 @@ class ReportBody(BaseModel):
     label: str
     photoUrl: str | None = None
     userName: str
-    points: int
+    points: int = 0
+
+    @field_validator("lat")
+    @classmethod
+    def validate_lat(cls, v: float) -> float:
+        if not (-90.0 <= v <= 90.0):
+            raise ValueError("Latitude must be between -90 and 90")
+        return v
+
+    @field_validator("lng")
+    @classmethod
+    def validate_lng(cls, v: float) -> float:
+        if not (-180.0 <= v <= 180.0):
+            raise ValueError("Longitude must be between -180 and 180")
+        return v
+
+    @field_validator("category")
+    @classmethod
+    def validate_category(cls, v: str) -> str:
+        if v not in ("bin", "trash"):
+            raise ValueError("Category must be 'bin' or 'trash'")
+        return v
+
+    @field_validator("userName")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        cleaned = v.strip()
+        if not cleaned or len(cleaned) > 50:
+            raise ValueError("Username must be between 1 and 50 characters")
+        return cleaned
 
 
 class DeleteReportBody(BaseModel):
@@ -165,10 +208,19 @@ def get_reports():
 
 
 @app.post("/api/v1/reports")
-def create_report(body: ReportBody):
+@limiter.limit("30/minute")
+def create_report(request: Request, body: ReportBody):
     ensure_user(body.userName)
-    report = add_report(body.model_dump())
-    log.info("Report saqlandi: %s (%s)", body.userName, body.category)
+    if body.category == "trash":
+        points = calc_trash_points()
+    else:
+        bin_type = body.type if body.type in ("street", "wheel", "large") else "street"
+        points = calc_bin_points(bin_type, 85)
+
+    payload = body.model_dump()
+    payload["points"] = points
+    report = add_report(payload)
+    log.info("Report saqlandi: %s (%s, %d ball)", body.userName, body.category, points)
     broadcast.emit("report.created", {"report": report})
     emit_stats()
     broadcast.emit(
@@ -269,15 +321,25 @@ def read_notifications(username: str):
     return {"ok": True}
 
 
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic"}
+
+
 @app.post("/api/v1/analyze")
-async def analyze(image: UploadFile = File(...)):
+@limiter.limit("15/minute")
+async def analyze(request: Request, image: UploadFile = File(...)):
     filename = image.filename or "photo.jpg"
     log.info("--- /api/v1/analyze: %s ---", filename)
 
     if not is_gemma_configured():
         return {"ok": False, "error": "AI sozlanmagan — server/.env da GEMMA_API_KEY qo'ying"}
 
-    data = await image.read()
+    if image.content_type and image.content_type.lower() not in ALLOWED_IMAGE_TYPES:
+        return {"ok": False, "error": "Faqat JPEG, PNG yoki WebP formatdagi rasmlar qabul qilinadi"}
+
+    data = await image.read(MAX_IMAGE_SIZE + 1)
+    if len(data) > MAX_IMAGE_SIZE:
+        return {"ok": False, "error": "Rasm juda katta (maksimal 10 MB)"}
     if len(data) < 1000:
         return {"ok": False, "error": "Rasm juda kichik"}
 
@@ -288,12 +350,27 @@ async def analyze(image: UploadFile = File(...)):
     return {"ok": True, **result}
 
 
+DIST_DIR = Path(__file__).parent.parent / "dist"
+if (DIST_DIR / "index.html").exists():
+    app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        file_path = DIST_DIR / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(DIST_DIR / "index.html")
+
+
 if __name__ == "__main__":
     import uvicorn
 
+    is_dev = os.getenv("ENV", "production").lower() in ("dev", "development")
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=int(os.getenv("PORT", "8000")),
-        reload=True,
+        reload=is_dev,
     )
