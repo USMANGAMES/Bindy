@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Circle, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import type { RecyclingBin, RouteResult } from '../../types'
 import type { CommunityReport } from '../../hooks/useCommunityReports'
@@ -88,10 +88,12 @@ function MapController({
   center,
   flyToTarget,
   isNavigating,
+  locateTrigger,
 }: {
   center: [number, number]
   flyToTarget: { lat: number; lng: number } | null
   isNavigating: boolean
+  locateTrigger?: number
 }) {
   const map = useMap()
 
@@ -104,6 +106,11 @@ function MapController({
     if (isNavigating || !flyToTarget) return
     map.flyTo([flyToTarget.lat, flyToTarget.lng], 16, { duration: 0.8 })
   }, [flyToTarget, map, isNavigating])
+
+  useEffect(() => {
+    if (!locateTrigger) return
+    map.flyTo(center, 16, { duration: 0.8 })
+  }, [locateTrigger, center, map])
 
   return null
 }
@@ -122,6 +129,8 @@ type BindyMapProps = {
   onSelectReport: (report: CommunityReport) => void
   hiddenItemIds?: Set<string>
   mapStyle?: MapStyle
+  locateTrigger?: number
+  accuracy?: number | null
 }
 
 const CARTO_KEY = 'cb1_4vg7_1_bd20dcd09a3632fe1b5facb3'
@@ -146,6 +155,8 @@ export function BindyMap({
   onSelectReport,
   hiddenItemIds,
   mapStyle = 'voyager',
+  locateTrigger,
+  accuracy,
 }: BindyMapProps) {
   const seedBins = useMemo(() => {
     return SEED_BINS.filter((bin) => !hiddenItemIds?.has(bin.id))
@@ -181,11 +192,28 @@ export function BindyMap({
           url={STYLE_URLS[mapStyle] || STYLE_URLS.voyager}
           maxZoom={20}
         />
-        <MapController center={userPosition} flyToTarget={flyToTarget} isNavigating={isNavigating} />
+        <MapController
+          center={userPosition}
+          flyToTarget={flyToTarget}
+          isNavigating={isNavigating}
+          locateTrigger={locateTrigger}
+        />
         <RouteLayer route={route} />
         <RouteFitBounds route={isNavigating ? route : null} />
         <NavigationFollow userPosition={userPosition} active={isNavigating} />
         <Marker position={userPosition} icon={userIcon} zIndexOffset={1000} />
+        {accuracy && accuracy > 0 && accuracy < 2000 && (
+          <Circle
+            center={userPosition}
+            radius={accuracy}
+            pathOptions={{
+              color: '#10B981',
+              fillColor: '#10B981',
+              fillOpacity: 0.12,
+              weight: 1.5,
+            }}
+          />
+        )}
 
         {showSeedBins &&
           seedBins.map((bin) => (

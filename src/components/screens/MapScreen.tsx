@@ -33,7 +33,7 @@ export function MapScreen() {
   } = useApp()
   const { user } = useAuth()
   const adminUser = user && isAdminUsername(user.username) ? user.username : undefined
-  const { position, loading, refresh } = useGeolocation()
+  const { position, accuracy, loading, refresh } = useGeolocation()
   const nearbyBins = useNearbyBins(position, 1, hiddenItemIds)
   const community = useCommunityReports(position)
   const nav = useNavigation(position)
@@ -45,6 +45,12 @@ export function MapScreen() {
     return (localStorage.getItem('bindy-map-style') as MapStyle) || 'voyager'
   })
   const [styleSheetOpen, setStyleSheetOpen] = useState(false)
+  const [locateTrigger, setLocateTrigger] = useState(0)
+
+  const handleLocate = () => {
+    refresh()
+    setLocateTrigger(Date.now())
+  }
 
   const visibleTrash = layerFilter.trash ? community.trash : []
   const visibleCommunityBins = layerFilter.bin ? community.bins : []
@@ -122,18 +128,17 @@ export function MapScreen() {
         onSelectReport={handleSelectReport}
         hiddenItemIds={hiddenItemIds}
         mapStyle={mapStyle}
+        locateTrigger={locateTrigger}
+        accuracy={accuracy}
       />
       <MapHeader />
-      <MapControls
-        onLocate={refresh}
-        loading={loading}
-        onOpenStyles={() => setStyleSheetOpen(true)}
-      />
+      <MapControls onLocate={handleLocate} loading={loading} />
       <MapCategoryFilter
         filter={layerFilter}
         onChange={setLayerFilter}
         unreadCount={unreadCount}
         onOpenAlerts={() => setAlertsOpen(true)}
+        onOpenStyles={() => setStyleSheetOpen(true)}
       />
 
       <AnimatePresence>

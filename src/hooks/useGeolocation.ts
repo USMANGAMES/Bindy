@@ -8,12 +8,6 @@ type GeoState = {
   error: string | null
 }
 
-const GEO_OPTIONS: PositionOptions = {
-  enableHighAccuracy: true,
-  timeout: 15_000,
-  maximumAge: 0, // Force fresh hardware GPS lock, do not accept stale cell tower cache
-}
-
 export function useGeolocation() {
   const [state, setState] = useState<GeoState>({
     position: DEFAULT_CENTER,
@@ -40,40 +34,50 @@ export function useGeolocation() {
     stopWatch()
     setState((s) => ({ ...s, loading: true }))
 
-    // Quick initial high-accuracy query
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setState({
-          position: [pos.coords.latitude, pos.coords.longitude],
-          accuracy: pos.coords.accuracy,
-          loading: false,
-          error: null,
-        })
-      },
-      () => {
-        // Non-blocking: watchPosition will follow up
-      },
-      GEO_OPTIONS,
-    )
+    const handleSuccess = (pos: GeolocationPosition) => {
+      setState({
+        position: [pos.coords.latitude, pos.coords.longitude],
+        accuracy: Math.round(pos.coords.accuracy),
+        loading: false,
+        error: null,
+      })
+    }
 
-    // Continuous watch so satellite lock refines accuracy down to 3-10 meters
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        setState({
-          position: [pos.coords.latitude, pos.coords.longitude],
-          accuracy: pos.coords.accuracy,
-          loading: false,
-          error: null,
-        })
-      },
-      (err) => {
+    const handleError = (err: GeolocationPositionError) => {
+      // If high accuracy times out (e.g. indoors), try standard location
+      if (err.code !== 1) {
+        navigator.geolocation.getCurrentPosition(
+          handleSuccess,
+          (fallbackErr) => {
+            setState((s) => ({
+              ...s,
+              loading: false,
+              error: fallbackErr.code === 1 ? 'Location denied' : fallbackErr.message,
+            }))
+          },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 30000 },
+        )
+      } else {
         setState((s) => ({
           ...s,
           loading: false,
-          error: err.code === 1 ? 'Location denied' : err.message,
+          error: 'Location denied',
         }))
-      },
-      GEO_OPTIONS,
+      }
+    }
+
+    // Try high accuracy first (hardware GPS satellites)
+    navigator.geolocation.getCurrentPosition(
+      handleSuccess,
+      handleError,
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 },
+    )
+
+    // And watch continuously so position refines live
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      handleSuccess,
+      () => {},
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 },
     )
   }, [stopWatch])
 

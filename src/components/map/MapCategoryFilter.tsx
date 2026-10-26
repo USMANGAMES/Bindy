@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bell, Layers } from 'lucide-react'
+import { Bell, Layers, Palette } from 'lucide-react'
 
 export type MapLayerFilter = {
   bin: boolean
@@ -12,6 +12,7 @@ type MapCategoryFilterProps = {
   onChange: (next: MapLayerFilter) => void
   unreadCount?: number
   onOpenAlerts: () => void
+  onOpenStyles?: () => void
 }
 
 export function MapCategoryFilter({
@@ -19,6 +20,7 @@ export function MapCategoryFilter({
   onChange,
   unreadCount = 0,
   onOpenAlerts,
+  onOpenStyles,
 }: MapCategoryFilterProps) {
   const [open, setOpen] = useState(false)
 
@@ -63,6 +65,19 @@ export function MapCategoryFilter({
         )}
       </motion.button>
 
+      {onOpenStyles && (
+        <motion.button
+          type="button"
+          onClick={onOpenStyles}
+          whileTap={{ scale: 0.95 }}
+          aria-label="Xarita uslubi"
+          title="Xarita uslubi"
+          className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white/95 text-bindy-text shadow-soft backdrop-blur-md transition hover:bg-gray-50"
+        >
+          <Palette className="h-5 w-5 text-gray-700" strokeWidth={2} />
+        </motion.button>
+      )}
+
       <AnimatePresence>
         {open && (
           <motion.div
@@ -86,6 +101,20 @@ export function MapCategoryFilter({
               label="Trash"
               activeClass="border-bindy-accent bg-bindy-accent/10 text-bindy-accent"
             />
+            {onOpenStyles && (
+              <motion.button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  onOpenStyles()
+                }}
+                whileTap={{ scale: 0.95 }}
+                className="flex items-center gap-2 rounded-2xl border border-gray-100 bg-white/95 px-3 py-2 text-xs font-semibold text-bindy-text shadow-soft backdrop-blur-md transition hover:bg-gray-50 active:scale-95"
+              >
+                <Palette className="h-4 w-4 text-bindy-mint" />
+                <span>Uslub</span>
+              </motion.button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
