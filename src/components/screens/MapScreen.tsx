@@ -7,6 +7,7 @@ import { useNavigation } from '../../hooks/useNavigation'
 import { BindyMap } from '../map/BindyMap'
 import { MapHeader } from '../map/MapHeader'
 import { MapControls } from '../map/MapControls'
+import { MapStyleSheet, type MapStyle } from '../map/MapStyleSheet'
 import { MapCategoryFilter, type MapLayerFilter } from '../map/MapCategoryFilter'
 import { MapAlertsSheet } from '../map/MapAlertsSheet'
 import { BinDetailSheet } from '../map/BinDetailSheet'
@@ -40,17 +41,10 @@ export function MapScreen() {
   const [selectedReport, setSelectedReport] = useState<CommunityReport | null>(null)
   const [layerFilter, setLayerFilter] = useState<MapLayerFilter>({ bin: true, trash: true })
   const [alertsOpen, setAlertsOpen] = useState(false)
-  const [mapStyle, setMapStyle] = useState<'positron' | 'voyager'>(() => {
-    return (localStorage.getItem('bindy-map-style') as 'positron' | 'voyager') || 'positron'
+  const [mapStyle, setMapStyle] = useState<MapStyle>(() => {
+    return (localStorage.getItem('bindy-map-style') as MapStyle) || 'voyager'
   })
-
-  const handleToggleStyle = () => {
-    setMapStyle((prev) => {
-      const next = prev === 'positron' ? 'voyager' : 'positron'
-      localStorage.setItem('bindy-map-style', next)
-      return next
-    })
-  }
+  const [styleSheetOpen, setStyleSheetOpen] = useState(false)
 
   const visibleTrash = layerFilter.trash ? community.trash : []
   const visibleCommunityBins = layerFilter.bin ? community.bins : []
@@ -133,8 +127,7 @@ export function MapScreen() {
       <MapControls
         onLocate={refresh}
         loading={loading}
-        mapStyle={mapStyle}
-        onToggleStyle={handleToggleStyle}
+        onOpenStyles={() => setStyleSheetOpen(true)}
       />
       <MapCategoryFilter
         filter={layerFilter}
@@ -201,6 +194,16 @@ export function MapScreen() {
           setSelectedReport(null)
         }}
         navigating={nav.loading}
+      />
+
+      <MapStyleSheet
+        open={styleSheetOpen}
+        onClose={() => setStyleSheetOpen(false)}
+        currentStyle={mapStyle}
+        onSelectStyle={(s) => {
+          setMapStyle(s)
+          localStorage.setItem('bindy-map-style', s)
+        }}
       />
     </div>
   )
