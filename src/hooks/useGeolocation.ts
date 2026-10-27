@@ -28,6 +28,7 @@ type GeoState = {
   loading: boolean
   error: string | null
   isCoarse: boolean
+  hasAccurateFix: boolean
 }
 
 export function useGeolocation() {
@@ -37,6 +38,7 @@ export function useGeolocation() {
     loading: true,
     error: null,
     isCoarse: false,
+    hasAccurateFix: false,
   }))
 
   const watchIdRef = useRef<number | null>(null)
@@ -56,6 +58,7 @@ export function useGeolocation() {
         loading: false,
         error: 'Geolokatsiya brauzer tomonidan qo‘llab-quvvatlanmaydi',
         isCoarse: false,
+        hasAccurateFix: false,
       }))
       return
     }
@@ -68,23 +71,23 @@ export function useGeolocation() {
       const roundedAcc = Math.round(accuracy)
 
       // 1. ФИЛЬТР СОТОВЫХ ВЫШЕК (Cell-ID / Coarse Network)
-      // Если точность хуже 200 метров — это сотовая вышка оператора.
+      // Если точность хуже 200 метров — это сотовая вышка оператора или режим "Приблизительно".
       if (roundedAcc > MAX_ACCEPTABLE_ACCURACY_METERS) {
         // Если у нас уже есть точная позиция (дом по Wi-Fi или GPS),
-        // мы КАТЕГОРИЧЕСКИ ЗАПРЕЩАЕМ переносить маркер на вышку связи в 1 км!
+        // мы категорически запрещаем сбивать её на вышку связи в 1 км!
         if (hasAccurateFixRef.current) {
           return
         }
 
-        // Если это первый запуск в помещении:
-        // фиксируем как приблизительную, но не выдаем за точный уличный GPS
+        // Если режим приближенный:
+        // НЕ обновляем position сотовой вышкой, чтобы не показывать ложную точку на карте!
         setState((s) => ({
           ...s,
-          position: [latitude, longitude],
           accuracy: roundedAcc,
           loading: false,
           error: null,
           isCoarse: true,
+          hasAccurateFix: false,
         }))
         return
       }
@@ -104,6 +107,7 @@ export function useGeolocation() {
         loading: false,
         error: null,
         isCoarse: false,
+        hasAccurateFix: true,
       })
     }
 
@@ -114,19 +118,20 @@ export function useGeolocation() {
           ...s,
           loading: false,
           error: 'Geolokatsiyaga ruxsat berilmadi. Sozlamalardan ruxsat bering.',
+          hasAccurateFix: false,
         }))
         stopWatch()
         return
       }
 
       // При таймауте спутников (код 3) или временной недоступности (код 2)
-      // НИ В КОЕМ СЛУЧАЕ НЕ ВЫЗЫВАЕМ enableHighAccuracy: false!
       // watchPosition продолжает слушать датчики в фоне и поймает спутники/Wi-Fi
       if (!hasAccurateFixRef.current) {
         setState((s) => ({
           ...s,
           loading: false,
           error: null,
+          hasAccurateFix: false,
         }))
       }
     }
