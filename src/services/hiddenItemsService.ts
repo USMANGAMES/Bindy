@@ -1,5 +1,6 @@
 import { API_ENABLED, API_URL } from '../config/env'
 import { isServerOnline } from './serverHealth'
+import { authHeaders } from './authHeaders'
 
 const LOCAL_KEY = 'bindy-hidden-items'
 
@@ -36,7 +37,7 @@ export async function fetchHiddenIds(): Promise<string[]> {
 
 export async function hideMapItemOnServer(
   itemId: string,
-  adminUser: string,
+  _adminUser: string,
   reason: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!API_ENABLED || !isServerOnline()) {
@@ -46,8 +47,11 @@ export async function hideMapItemOnServer(
   try {
     const res = await fetch(`${API_URL}/api/v1/hidden-items`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemId, adminUser, reason }),
+      headers: {
+        ...authHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ itemId, reason }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {

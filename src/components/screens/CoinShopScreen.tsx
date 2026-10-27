@@ -5,18 +5,13 @@ import { useApp } from '../../context/AppContext'
 import { SHOP_PRODUCTS } from '../../data/shop'
 
 export function CoinShopScreen() {
-  const { state, redeemProduct } = useApp()
+  const { state } = useApp()
+  const [notice, setNotice] = useState<string | null>(null)
   const [couponModal, setCouponModal] = useState<{ brand: string; code: string } | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
-  const handleRedeem = (productId: string, brand: string) => {
-    setError(null)
-    const result = redeemProduct(productId)
-    if (result.ok) {
-      setCouponModal({ brand, code: result.code })
-    } else {
-      setError(result.reason)
-    }
+  const handleRedeem = (brand: string) => {
+    setNotice(`«${brand}» hamkorlik chegirmasi tez kunda faollashadi. Ballaringiz hisobingizda saqlanib qoladi! ✨`)
+    setTimeout(() => setNotice(null), 4000)
   }
 
   return (
@@ -30,22 +25,23 @@ export function CoinShopScreen() {
             <p className="text-3xl font-bold">{state.profile.points}</p>
           </div>
         </div>
-        <p className="mt-2 text-xs text-gray-500">
-          Trash +5 ball · Bin +6 ball · Do‘konlarda chegirma oling
-        </p>
+        <div className="mt-3 rounded-2xl bg-emerald-50 border border-emerald-100 p-3 text-xs text-emerald-800">
+          🌱 <strong>Hamkorlik dasturi tez kunda!</strong> Siz to‘plagan ballar orqali kafelar va do‘konlarda chegirmalar olish imkoniyati ochiladi.
+        </div>
       </div>
 
-      {error && (
-        <p className="mx-5 mb-2 rounded-2xl bg-red-50 px-4 py-2 text-center text-sm text-red-600">
-          {error}
-        </p>
+      {notice && (
+        <motion.p
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mx-5 mb-2 rounded-2xl bg-bindy-mint/10 border border-bindy-mint/20 px-4 py-2.5 text-center text-xs font-semibold text-bindy-text"
+        >
+          {notice}
+        </motion.p>
       )}
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
         {SHOP_PRODUCTS.map((product, i) => {
-          const owned = state.profile.redeemedCoupons.some((c) => c.productId === product.id)
-          const canAfford = state.profile.points >= product.pointsCost
-
           return (
             <motion.div
               key={product.id}
@@ -64,9 +60,14 @@ export function CoinShopScreen() {
                 </div>
                 <div className="flex flex-1 flex-col justify-between p-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                      {product.brand}
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                        {product.brand}
+                      </p>
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-600">
+                        Tez kunda
+                      </span>
+                    </div>
                     <p className="font-bold text-bindy-text">{product.name}</p>
                     <p className="mt-0.5 text-sm text-gray-500">{product.description}</p>
                   </div>
@@ -77,11 +78,10 @@ export function CoinShopScreen() {
                     </span>
                     <button
                       type="button"
-                      disabled={owned || !canAfford}
-                      onClick={() => handleRedeem(product.id, product.brand)}
-                      className="rounded-2xl bg-bindy-charcoal px-4 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                      onClick={() => handleRedeem(product.brand)}
+                      className="rounded-2xl bg-bindy-charcoal/80 hover:bg-bindy-charcoal px-3.5 py-1.5 text-xs font-semibold text-white transition-colors"
                     >
-                      {owned ? 'Olingan' : 'Olish'}
+                      Batafsil
                     </button>
                   </div>
                 </div>

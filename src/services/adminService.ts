@@ -2,10 +2,11 @@ import { API_ENABLED, API_URL } from '../config/env'
 import { isAdminUsername } from '../config/admins'
 import { hideMapItemOnServer } from './hiddenItemsService'
 import { isServerOnline } from './serverHealth'
+import { authHeaders } from './authHeaders'
 
 export async function adminDeleteReport(
   reportId: string,
-  adminUser: string,
+  _adminUser: string,
   reason: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!API_ENABLED || !isServerOnline()) {
@@ -14,8 +15,11 @@ export async function adminDeleteReport(
   try {
     const res = await fetch(`${API_URL}/api/v1/reports/${reportId}`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adminUser, reason }),
+      headers: {
+        ...authHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ reason }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {

@@ -1,34 +1,4 @@
 {
-  "ids": [
-    "b2",
-    "117efa83-8aba-42f0-a35d-3703a6219240",
-    "53d62a32-5886-46cc-923e-01e34a055075",
-    "b8"
-  ],
-  "log": [
-    {
-      "id": "b8",
-      "adminUser": "Khafizov",
-      "reason": "adwa dad ad awd sad adw",
-      "at": "2026-06-23T14:04:53Z"
-    },
-    {
-      "id": "53d62a32-5886-46cc-923e-01e34a055075",
-      "adminUser": "Khafizov",
-      "reason": "adsadwa dsa dwa dsad aw dad dw",
-      "at": "2026-06-23T13:51:14Z"
-    },
-    {
-      "id": "117efa83-8aba-42f0-a35d-3703a6219240",
-      "adminUser": "Khafizov",
-      "reason": "dawdasd  wadas dad wa da ad",
-      "at": "2026-06-23T13:51:01Z"
-    },
-    {
-      "id": "b2",
-      "adminUser": "Khafizov",
-      "reason": "ad ad adwa dadsd  daw",
-      "at": "2026-06-23T13:50:54Z"
-    }
-  ]
+  "ids": [],
+  "log": []
 }

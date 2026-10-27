@@ -1,4 +1,5 @@
 import { API_URL } from '../config/env'
+import { authHeaders } from './authHeaders'
 
 export class ApiError extends Error {
   status: number
@@ -14,10 +15,11 @@ export async function apiFetch<T>(
   options?: RequestInit,
 ): Promise<T> {
   const base = API_URL || ''
+  const defaultHeaders = authHeaders() as Record<string, string>
   const res = await fetch(`${base}${path}`, {
     ...options,
     headers: {
-      Accept: 'application/json',
+      ...defaultHeaders,
       ...options?.headers,
     },
   })
