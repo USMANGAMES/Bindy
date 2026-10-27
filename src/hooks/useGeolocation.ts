@@ -131,10 +131,18 @@ export function useGeolocation() {
       }
     }
 
-    // Профессиональная конфигурация навигатора (Google Maps / Leaflet standard):
-    // - enableHighAccuracy: ВСЕГДА true (включает аппаратный GPS на улице + Wi-Fi WPS сканирование дома)
-    // - timeout: 30000 (30 секунд на холодный старт чипа)
-    // - maximumAge: 0 (запрет отдавать старые вышки связи из кэша)
+    // 1. Немедленный разогрев чипа GPS (активирует значок локации в статус-баре Android/iOS)
+    navigator.geolocation.getCurrentPosition(
+      handleSuccess,
+      handleError,
+      {
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 0,
+      },
+    )
+
+    // 2. Непрерывный слушатель обновлений высокой точности
     watchIdRef.current = navigator.geolocation.watchPosition(
       handleSuccess,
       handleError,

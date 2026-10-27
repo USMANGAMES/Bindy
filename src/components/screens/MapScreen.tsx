@@ -133,9 +133,9 @@ export function MapScreen() {
       />
       <MapHeader />
       {isCoarse && (
-        <div className="pointer-events-none absolute left-1/2 top-[calc(max(0.75rem,env(safe-area-inset-top))+4.5rem)] z-[600] flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/75 px-3.5 py-1 text-[11px] font-medium text-white shadow-soft backdrop-blur-sm">
-          <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-          <span>Aniq GPS signali qidirilmoqda...</span>
+        <div className="pointer-events-none absolute left-1/2 top-[calc(max(0.75rem,env(safe-area-inset-top))+4.5rem)] z-[600] flex max-w-[90%] -translate-x-1/2 items-center gap-2 rounded-2xl bg-black/85 px-3.5 py-2 text-[11px] font-medium text-white shadow-soft backdrop-blur-sm">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400 animate-pulse" />
+          <span>Aniq GPS yoqilmagan. Chrome sozlamalarida «Aniq joylashuv» (Точная геопозиция) yoqilganligini tekshiring</span>
         </div>
       )}
       <MapControls onLocate={handleLocate} loading={loading} />
