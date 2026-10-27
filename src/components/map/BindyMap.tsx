@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Circle, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import type { RecyclingBin, RouteResult } from '../../types'
@@ -98,19 +98,22 @@ function MapController({
   hasAccurateFix?: boolean
 }) {
   const map = useMap()
+  const hasCenteredInitialRef = useRef(false)
 
+  // 1. Центрируем карту на пользователе ТОЛЬКО ОДИН РАЗ при первой фиксации точного GPS
   useEffect(() => {
-    if (isNavigating) return
-    if (hasAccurateFix) {
-      map.setView(center, map.getZoom(), { animate: true })
-    }
+    if (isNavigating || hasCenteredInitialRef.current || !hasAccurateFix) return
+    map.setView(center, map.getZoom() || 15, { animate: true })
+    hasCenteredInitialRef.current = true
   }, [center, map, isNavigating, hasAccurateFix])
 
+  // 2. Полёт к выбранному контейнеру или отчету
   useEffect(() => {
     if (isNavigating || !flyToTarget) return
     map.flyTo([flyToTarget.lat, flyToTarget.lng], 16, { duration: 0.8 })
   }, [flyToTarget, map, isNavigating])
 
+  // 3. Полёт к пользователю ТОЛЬКО при явном нажатии кнопки прицела 🎯
   useEffect(() => {
     if (!locateTrigger) return
     if (hasAccurateFix) {

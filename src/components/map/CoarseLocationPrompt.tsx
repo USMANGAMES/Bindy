@@ -1,17 +1,19 @@
 import { useState } from 'react'
-import { Compass, Lock, RefreshCw, X, ShieldAlert } from 'lucide-react'
+import { Compass, Lock, RefreshCw, X, ShieldAlert, Check } from 'lucide-react'
 import { SwipeableBottomSheet } from './SwipeableBottomSheet'
 
 type CoarseLocationPromptProps = {
   open: boolean
   onClose: () => void
   onRefresh: () => void
+  hasAccurateFix?: boolean
 }
 
 export function CoarseLocationPrompt({
   open,
   onClose,
   onRefresh,
+  hasAccurateFix = false,
 }: CoarseLocationPromptProps) {
   const [refreshing, setRefreshing] = useState(false)
 
@@ -20,7 +22,7 @@ export function CoarseLocationPrompt({
     onRefresh()
     setTimeout(() => {
       setRefreshing(false)
-    }, 1500)
+    }, 2000)
   }
 
   return (
@@ -86,11 +88,21 @@ export function CoarseLocationPrompt({
           <button
             type="button"
             onClick={handleRefreshClick}
-            disabled={refreshing}
+            disabled={refreshing || hasAccurateFix}
             className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-bindy-mint py-3 text-xs font-semibold text-white shadow-soft transition hover:opacity-95 active:scale-[0.98] disabled:opacity-60"
           >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            <span>{refreshing ? 'Tekshirilmoqda...' : 'Qayta tekshirish'}</span>
+            {hasAccurateFix ? (
+              <Check className="h-4 w-4 text-white" />
+            ) : (
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            )}
+            <span>
+              {hasAccurateFix
+                ? 'Aniq GPS topildi!'
+                : refreshing
+                  ? 'Tekshirilmoqda...'
+                  : 'Qayta tekshirish'}
+            </span>
           </button>
           <button
             type="button"

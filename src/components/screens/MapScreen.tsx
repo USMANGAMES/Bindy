@@ -62,6 +62,14 @@ export function MapScreen() {
   const visibleCommunityBins = layerFilter.bin ? community.bins : []
   const visibleSeedBins = layerFilter.bin ? nearbyBins : []
 
+  // Avtomatik ravishda aniq GPS topilganda shtorkani yopish va foydalanuvchiga uchib borish
+  useEffect(() => {
+    if (hasAccurateFix && !isCoarse && coarsePromptOpen) {
+      setCoarsePromptOpen(false)
+      setLocateTrigger(Date.now())
+    }
+  }, [hasAccurateFix, isCoarse, coarsePromptOpen])
+
   useEffect(() => {
     if (selectedReport?.category === 'trash' && !layerFilter.trash) {
       setSelectedReport(null)
@@ -235,6 +243,7 @@ export function MapScreen() {
         open={coarsePromptOpen}
         onClose={() => setCoarsePromptOpen(false)}
         onRefresh={handleLocate}
+        hasAccurateFix={hasAccurateFix}
       />
     </div>
   )
