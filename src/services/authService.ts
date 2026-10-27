@@ -1,13 +1,9 @@
-import {
-  addUser,
-  checkLogin,
-  findUserByUsername,
-  usernameTaken,
-} from '../data/usersStore'
+import { API_URL } from '../config/env'
 
 export type AuthUser = {
   id: number
   username: string
+  isAdmin?: boolean
 }
 
 const TOKEN_KEY = 'bindy-auth-token'
@@ -36,40 +32,69 @@ export function clearAuth() {
   localStorage.removeItem(USER_KEY)
 }
 
-function makeToken(user: AuthUser): string {
-  return `bindy-${user.id}-${user.username}`
-}
-
 export async function registerUser(
   username: string,
   password: string,
 ): Promise<{ ok: true; token: string; user: AuthUser } | { ok: false; error: string }> {
   const name = username.trim()
   if (name.length < 3) {
-    return { ok: false, error: 'Username kamida 3 ta belgi' }
+    return { ok: false, error: 'Username kamida 3 ta belgi bo‘lishi kerak' }
   }
   if (password.length < 4) {
-    return { ok: false, error: 'Parol kamida 4 ta belgi' }
-  }
-  if (usernameTaken(name)) {
-    return { ok: false, error: 'Bu username band' }
+    return { ok: false, error: 'Parol kamida 4 ta belgi bo‘lishi kerak' }
   }
 
-  const record = addUser(name, password)
-  const user: AuthUser = { id: record.id, username: record.username }
-  return { ok: true, token: makeToken(user), user }
+  try {
+    const base = API_URL || ''
+    const res = await fetch(`${base}/api/v1/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ username: name, password }),
+    })
+
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      const err = data.detail || 'Ro‘yxatdan o‘tib bo‘lmadi'
+      return { ok: false, error: typeof err === 'string' ? err : 'Xatolik yuz berdi' }
+    }
+
+    return { ok: true, token: data.token, user: data.user }
+  } catch (e) {
+    console.warn('[bindy] auth register failed:', e)
+    return { ok: false, error: 'Server bilan aloqa yo‘q, keyinroq urinib ko‘ring' }
+  }
 }
 
 export async function loginUser(
   username: string,
   password: string,
 ): Promise<{ ok: true; token: string; user: AuthUser } | { ok: false; error: string }> {
-  const record = checkLogin(username, password)
-  if (!record) {
-    return { ok: false, error: 'Username yoki parol noto‘g‘ri' }
+  const name = username.trim()
+  try {
+    const base = API_URL || ''
+    const res = await fetch(`${base}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ username: name, password }),
+    })
+
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      const err = data.detail || 'Username yoki parol noto‘g‘ri'
+      return { ok: false, error: typeof err === 'string' ? err : 'Username yoki parol noto‘g‘ri' }
+    }
+
+    return { ok: true, token: data.token, user: data.user }
+  } catch (e) {
+    console.warn('[bindy] auth login failed:', e)
+    return { ok: false, error: 'Server bilan aloqa yo‘q, keyinroq urinib ko‘ring' }
   }
-  const user: AuthUser = { id: record.id, username: record.username }
-  return { ok: true, token: makeToken(user), user }
 }
 
 export function verifySession(): AuthUser | null {
@@ -79,10 +104,32 @@ export function verifySession(): AuthUser | null {
     clearAuth()
     return null
   }
-  const record = findUserByUsername(user.username)
-  if (!record || record.id !== user.id) {
-    clearAuth()
-    return null
-  }
   return user
+}
+
+export async function fetchCurrentUser(): Promise<AuthUser | null> {
+  const token = getStoredToken()
+  if (!token) return null
+
+  try {
+    const base = API_URL || ''
+    const res = await fetch(`${base}/api/v1/auth/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+    })
+    if (!res.ok) {
+      clearAuth()
+      return null
+    }
+    const data = await res.json()
+    if (data.ok && data.user) {
+      saveAuth(token, data.user)
+      return data.user
+    }
+    return null
+  } catch {
+    return getStoredUser()
+  }
 }

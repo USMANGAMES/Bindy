@@ -3,6 +3,8 @@ import type { BinAnalysis, CaptureView } from '../types'
 import { analyzeBinPhoto } from '../services/aiService'
 import { useApp } from '../context/AppContext'
 import { fileToDataUrl } from '../utils/file'
+import { compressImage } from '../utils/imageCompressor'
+import { uploadPhoto } from '../services/uploadService'
 
 export function useCaptureFlow(userPosition: [number, number]) {
   const { recordSubmission } = useApp()
@@ -54,7 +56,14 @@ export function useCaptureFlow(userPosition: [number, number]) {
     if (result.ok) {
       setAnalysis(result.data)
       setErrorMessage(undefined)
-      const persistedPhoto = await fileToDataUrl(photoFile)
+
+      // 1. Compress image to max 1280px WebP (~150-250KB)
+      const compressed = await compressImage(photoFile)
+      
+      // 2. Upload to server static storage /uploads/*.webp
+      const serverPhotoUrl = await uploadPhoto(compressed)
+      const persistedPhoto = serverPhotoUrl || (await fileToDataUrl(compressed))
+
       await recordSubmission(result.data, {
         photoUrl: persistedPhoto,
         position: positionRef.current,

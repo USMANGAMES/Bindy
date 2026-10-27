@@ -1,11 +1,14 @@
 import type { BindyNotification, LeaderboardUser } from '../types'
 import { API_ENABLED, API_URL } from '../config/env'
 import { isServerOnline } from './serverHealth'
+import { authHeaders } from './authHeaders'
 
 export async function fetchNotifications(username: string): Promise<BindyNotification[]> {
   if (!isServerOnline()) return loadLocalNotifications(username)
   try {
-    const res = await fetch(`${API_URL}/api/v1/notifications/${encodeURIComponent(username)}`)
+    const res = await fetch(`${API_URL}/api/v1/notifications/${encodeURIComponent(username)}`, {
+      headers: authHeaders(),
+    })
     if (!res.ok) return loadLocalNotifications(username)
     const data = (await res.json()) as { notifications: BindyNotification[] }
     return data.notifications ?? []

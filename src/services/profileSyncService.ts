@@ -2,6 +2,7 @@ import { API_ENABLED, API_URL } from '../config/env'
 import type { RedeemedCoupon, SharedReport, Submission, UserProfile, ServerUserProfile } from '../types'
 import { isServerOnline } from './serverHealth'
 import { publishReport } from './reportsService'
+import { authHeaders } from './authHeaders'
 
 export async function syncProfileToServer(
   username: string,
@@ -11,7 +12,10 @@ export async function syncProfileToServer(
   try {
     const res = await fetch(`${API_URL || ''}/api/v1/users/profile`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        ...authHeaders(),
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         username,
         points: profile.points,

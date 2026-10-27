@@ -1,6 +1,8 @@
 import type { AppState } from '../types'
 
 const STORAGE_KEY = 'bindy-app-state'
+const VERSION_KEY = 'bindy-storage-version'
+const CURRENT_VERSION = '2.0.0-prod'
 
 const DEFAULT_STATE: AppState = {
   globalBinCount: 0,
@@ -17,6 +19,15 @@ const DEFAULT_STATE: AppState = {
 
 export function loadState(): AppState {
   try {
+    const version = localStorage.getItem(VERSION_KEY)
+    if (version !== CURRENT_VERSION) {
+      // Clean slate migration: clear stale mock points and users
+      localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem('bindy-users')
+      localStorage.setItem(VERSION_KEY, CURRENT_VERSION)
+      return { ...DEFAULT_STATE }
+    }
+
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...DEFAULT_STATE }
     const parsed = JSON.parse(raw) as AppState
