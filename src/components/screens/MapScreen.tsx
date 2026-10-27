@@ -33,7 +33,7 @@ export function MapScreen() {
   } = useApp()
   const { user } = useAuth()
   const adminUser = user && isAdminUsername(user.username) ? user.username : undefined
-  const { position, accuracy, loading, refresh } = useGeolocation()
+  const { position, accuracy, loading, refresh, isCoarse } = useGeolocation()
   const nearbyBins = useNearbyBins(position, 1, hiddenItemIds)
   const community = useCommunityReports(position)
   const nav = useNavigation(position)
@@ -132,6 +132,12 @@ export function MapScreen() {
         accuracy={accuracy}
       />
       <MapHeader />
+      {isCoarse && (
+        <div className="pointer-events-none absolute left-1/2 top-[calc(max(0.75rem,env(safe-area-inset-top))+4.5rem)] z-[600] flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/75 px-3.5 py-1 text-[11px] font-medium text-white shadow-soft backdrop-blur-sm">
+          <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+          <span>Aniq GPS signali qidirilmoqda...</span>
+        </div>
+      )}
       <MapControls onLocate={handleLocate} loading={loading} />
       <MapCategoryFilter
         filter={layerFilter}
