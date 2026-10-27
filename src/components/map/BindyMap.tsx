@@ -133,11 +133,15 @@ type BindyMapProps = {
   accuracy?: number | null
 }
 
-const CARTO_KEY = 'cb1_4vg7_1_bd20dcd09a3632fe1b5facb3'
+const CARTO_KEY = (import.meta.env.VITE_CARTO_API_KEY as string | undefined)?.trim() || ''
 
 const STYLE_URLS: Record<MapStyle, string> = {
-  voyager: `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`,
-  positron: `https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`,
+  voyager: CARTO_KEY
+    ? `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`
+    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  positron: CARTO_KEY
+    ? `https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`
+    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
   osm: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
 }
 
