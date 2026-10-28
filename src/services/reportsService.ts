@@ -16,6 +16,7 @@ export async function fetchSharedReports(): Promise<SharedReport[]> {
 }
 
 export type CreateReportPayload = {
+  id?: string
   lat: number
   lng: number
   category: ReportCategory

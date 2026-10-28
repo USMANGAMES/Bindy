@@ -235,9 +235,9 @@ def sync_user_profile(username: str, data: dict) -> dict:
 
     # Load current
     cur_profile = get_user_profile(uname)
-    points = data.get("points") if data.get("points") is not None else cur_profile["points"]
-    bins_reported = data.get("binsReported") if data.get("binsReported") is not None else cur_profile["binsReported"]
-    streak = data.get("streak") if data.get("streak") is not None else cur_profile["streak"]
+    points = max(cur_profile["points"], int(data["points"])) if data.get("points") is not None else cur_profile["points"]
+    bins_reported = max(cur_profile["binsReported"], int(data["binsReported"])) if data.get("binsReported") is not None else cur_profile["binsReported"]
+    streak = max(cur_profile["streak"], int(data["streak"])) if data.get("streak") is not None else cur_profile["streak"]
 
     subs = data.get("submissions") if data.get("submissions") is not None else cur_profile["submissions"]
     coupons = data.get("redeemedCoupons") if data.get("redeemedCoupons") is not None else cur_profile["redeemedCoupons"]
@@ -311,7 +311,7 @@ def list_reports(limit: int = 500) -> list:
 
 
 def add_report(payload: dict) -> dict:
-    report_id = str(uuid.uuid4())
+    report_id = payload.get("id") or str(uuid.uuid4())
     now_str = _now()
     username = payload.get("userName", "").strip()
     user_id = payload.get("userId")
@@ -324,6 +324,44 @@ def add_report(payload: dict) -> dict:
         if u:
             user_id = u["id"]
 
+    # ── Deduplication Checks ──────────────────────────────────
+    # 1. By ID: if report already exists, return it directly without awarding points again
+    existing = con.execute("SELECT id FROM reports WHERE id = ?", (report_id,)).fetchone()
+    if existing:
+        con.close()
+        rep = get_report(report_id)
+        return rep if rep else {"id": report_id}
+
+    # 2. By Photo URL (if photo exists and was submitted by this user in last 10 minutes)
+    photo_url = payload.get("photoUrl")
+    if photo_url and username:
+        dup = con.execute(
+            """SELECT id FROM reports 
+               WHERE username = ? AND photo_url = ? AND created_at >= datetime('now', '-10 minutes')""",
+            (username, photo_url),
+        ).fetchone()
+        if dup:
+            con.close()
+            rep = get_report(dup["id"])
+            return rep if rep else {"id": dup["id"]}
+
+    # 3. By Exact Coordinates for same user within last 1 minute
+    lat = float(payload["lat"])
+    lng = float(payload["lng"])
+    if username:
+        dup_geo = con.execute(
+            """SELECT id FROM reports 
+               WHERE username = ? 
+                 AND ABS(lat - ?) < 0.0001 
+                 AND ABS(lng - ?) < 0.0001 
+                 AND created_at >= datetime('now', '-1 minute')""",
+            (username, lat, lng),
+        ).fetchone()
+        if dup_geo:
+            con.close()
+            rep = get_report(dup_geo["id"])
+            return rep if rep else {"id": dup_geo["id"]}
+
     with con:
         con.execute(
             """INSERT INTO reports (id, user_id, username, lat, lng, category, type, label, photo_url, points, created_at)
@@ -332,12 +370,12 @@ def add_report(payload: dict) -> dict:
                 report_id,
                 user_id,
                 username,
-                float(payload["lat"]),
-                float(payload["lng"]),
+                lat,
+                lng,
                 payload["category"],
                 payload["type"],
                 payload.get("label", ""),
-                payload.get("photoUrl"),
+                photo_url,
                 points,
                 now_str,
             ),
@@ -351,12 +389,12 @@ def add_report(payload: dict) -> dict:
         "id": report_id,
         "userId": user_id,
         "userName": username,
-        "lat": payload["lat"],
-        "lng": payload["lng"],
+        "lat": lat,
+        "lng": lng,
         "category": payload["category"],
         "type": payload["type"],
         "label": payload.get("label", ""),
-        "photoUrl": payload.get("photoUrl"),
+        "photoUrl": photo_url,
         "points": points,
         "createdAt": now_str,
     }

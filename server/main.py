@@ -119,6 +119,7 @@ class AuthLoginBody(BaseModel):
 
 
 class ReportBody(BaseModel):
+    id: Optional[str] = None
     lat: float
     lng: float
     category: str
@@ -319,11 +320,12 @@ def create_report(
     username = user["username"] if user else body.userName
     ensure_user(username)
 
-    if body.category == "trash":
+    if body.points > 0:
+        points = body.points
+    elif body.category == "trash":
         points = calc_trash_points()
     else:
-        bin_type = body.type if body.type in ("street", "wheel", "large") else "street"
-        points = calc_bin_points(bin_type, 85)
+        points = calc_bin_points("street", 85)
 
     payload = body.model_dump()
     payload["userName"] = username
