@@ -1,7 +1,7 @@
 import type { AppState } from '../types'
 
 const VERSION_KEY = 'bindy-storage-version'
-const CURRENT_VERSION = '2.1.0-prod'
+const CURRENT_VERSION = '2.2.0-clean'
 
 const DEFAULT_STATE: AppState = {
   globalBinCount: 0,
@@ -25,9 +25,14 @@ export function loadState(username?: string): AppState {
   try {
     const version = localStorage.getItem(VERSION_KEY)
     if (version !== CURRENT_VERSION) {
-      // Clean slate migration: clear legacy shared un-scoped state
-      localStorage.removeItem('bindy-app-state')
-      localStorage.removeItem('bindy-users')
+      // Clean slate migration: clear cached user states, notifications, and hidden items
+      const preserveKeys = new Set(['bindy-auth-token', 'bindy-user', 'bindy-map-style', 'bindy-install-dismissed'])
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i)
+        if (k && k.startsWith('bindy-') && k !== VERSION_KEY && !preserveKeys.has(k)) {
+          localStorage.removeItem(k)
+        }
+      }
       localStorage.setItem(VERSION_KEY, CURRENT_VERSION)
     }
 
