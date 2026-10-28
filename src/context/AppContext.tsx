@@ -25,9 +25,9 @@ import { fetchHiddenIds, hideMapItemLocal, loadLocalHiddenIds, setLocalHiddenIds
 import { subscribeRealtime } from '../services/realtimeService'
 import {
   mergeUserProfile,
-  pushPendingReports,
   syncProfileToServer,
 } from '../services/profileSyncService'
+import { redeemShopProduct } from '../services/shopService'
 import { SHOP_PRODUCTS } from '../data/shop'
 
 type AppContextValue = {
@@ -50,16 +50,10 @@ type AppContextValue = {
   ) => Promise<void>
   updateName: (name: string) => void
   syncPointsFromServer: () => Promise<void>
-  redeemProduct: (productId: string) => { ok: true; code: string } | { ok: false; reason: string }
+  redeemProduct: (productId: string) => Promise<{ ok: true; code: string } | { ok: false; reason: string }>
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
-
-function makeCouponCode(productId: string): string {
-  const part = productId.split('-')[0].toUpperCase().slice(0, 4)
-  const num = Math.floor(1000 + Math.random() * 9000)
-  return `BINDY-${part}-${num}`
-}
 
 export function AppProvider({
   children,
@@ -68,15 +62,7 @@ export function AppProvider({
   children: ReactNode
   username: string
 }) {
-  const [state, setState] = useState<AppState>(() => {
-    const loaded = loadState()
-    if (loaded.profile.name !== username) {
-      const next = { ...loaded, profile: { ...loaded.profile, name: username } }
-      saveState(next)
-      return next
-    }
-    return loaded
-  })
+  const [state, setState] = useState<AppState>(() => loadState(username))
   const [sharedReports, setSharedReports] = useState<SharedReport[]>([])
   const [notifications, setNotifications] = useState<BindyNotification[]>([])
   const [hiddenItemIds, setHiddenItemIds] = useState<Set<string>>(
@@ -101,7 +87,7 @@ export function AppProvider({
   }, [])
 
   const persistProfile = useCallback(
-    async (profile = loadState().profile) => {
+    async (profile = loadState(username).profile) => {
       await syncProfileToServer(username, profile)
     },
     [username],
@@ -115,40 +101,20 @@ export function AppProvider({
       setNotifications(snapshot.notifications)
       setLeaderboard(snapshot.leaderboard)
 
-      const current = loadState()
+      // Adopt userProfile from server as single source of truth
+      const current = loadState(username)
       const mergedProfile = mergeUserProfile(current.profile, snapshot.userProfile)
-      const hidden = new Set(snapshot.hiddenIds)
-
-      const { reports, idMap } = await pushPendingReports(
-        username,
-        mergedProfile.submissions,
-        snapshot.reports,
-        hidden,
-      )
-
-      if (idMap.size > 0) {
-        mergedProfile.submissions = mergedProfile.submissions.map((s) =>
-          idMap.has(s.id) ? { ...s, id: idMap.get(s.id)! } : s,
-        )
-      }
 
       const nextState: AppState = { ...current, profile: mergedProfile }
-      saveState(nextState)
+      saveState(nextState, username)
       setState(nextState)
-      setSharedReports(reports)
-
-      await syncProfileToServer(username, mergedProfile)
+      setSharedReports(snapshot.reports)
     },
     [username],
   )
 
   useEffect(() => {
-    setState((prev) => {
-      if (prev.profile.name === username) return prev
-      const next = { ...prev, profile: { ...prev.profile, name: username } }
-      saveState(next)
-      return next
-    })
+    setState(loadState(username))
   }, [username])
 
   const refreshSharedReports = useCallback(async () => {
@@ -213,10 +179,22 @@ export function AppProvider({
       },
       onUserStatsUpdated: (stats) => {
         setState((prev) => {
-          const points = Math.max(prev.profile.points, stats.points)
-          if (prev.profile.points === points) return prev
-          const next = { ...prev, profile: { ...prev.profile, points } }
-          saveState(next)
+          if (
+            prev.profile.points === stats.points &&
+            prev.profile.binsReported === stats.reports
+          ) {
+            return prev
+          }
+          const next = {
+            ...prev,
+            profile: {
+              ...prev.profile,
+              points: stats.points,
+              binsReported: stats.reports,
+              streak: typeof stats.streak === 'number' ? stats.streak : prev.profile.streak,
+            },
+          }
+          saveState(next, username)
           return next
         })
       },
@@ -224,7 +202,7 @@ export function AppProvider({
         setState((prev) => {
           const merged = mergeUserProfile(prev.profile, profile)
           const next = { ...prev, profile: merged }
-          saveState(next)
+          saveState(next, username)
           return next
         })
       },
@@ -246,8 +224,8 @@ export function AppProvider({
   ])
 
   const completeSplash = useCallback(() => {
-    setState((s) => markSplashSeen(s))
-  }, [])
+    setState((s) => markSplashSeen(s, username))
+  }, [username])
 
   const recordSubmission = useCallback(
     async (
@@ -256,65 +234,70 @@ export function AppProvider({
     ) => {
       const [lat, lng] = options?.position ?? []
       const submissionId = crypto.randomUUID()
+      const createdAt = new Date().toISOString()
+
+      const published =
+        lat != null && lng != null
+          ? await publishReport({
+              id: submissionId,
+              lat,
+              lng,
+              category: analysis.category,
+              type: analysis.type,
+              label: analysis.label,
+              photoUrl: options?.photoUrl,
+              userName: username,
+              points: analysis.points,
+            })
+          : null
+
+      const report = published?.report
+      const userStats = published?.userStats
+      const pointsAwarded = report?.points ?? analysis.points
+      const finalId = report?.id ?? submissionId
+
+      const submission: Submission = {
+        id: finalId,
+        type: analysis.type,
+        category: analysis.category,
+        points: pointsAwarded,
+        createdAt,
+        photoUrl: options?.photoUrl,
+        label: analysis.label,
+        ...(lat != null && lng != null ? { lat, lng } : {}),
+      }
 
       setState((prev) => {
-        const submission: Submission = {
-          id: submissionId,
-          type: analysis.type,
-          category: analysis.category,
-          points: analysis.points,
-          createdAt: new Date().toISOString(),
-          photoUrl: options?.photoUrl,
-          label: analysis.label,
-          ...(lat != null && lng != null ? { lat, lng } : {}),
-        }
+        // Points: Server is Single Source of Truth.
+        // If server returned userStats, take server's exact points; otherwise retain current state (updated via SSE).
+        const nextPoints = userStats ? userStats.points : prev.profile.points
+        const nextBins = userStats ? userStats.reports : prev.profile.binsReported + 1
+        const nextStreak =
+          userStats && typeof userStats.streak === 'number'
+            ? userStats.streak
+            : prev.profile.streak
 
         const next: AppState = {
           ...prev,
           globalBinCount: prev.globalBinCount + (analysis.category === 'bin' ? 1 : 0),
           profile: {
             ...prev.profile,
-            points: prev.profile.points + analysis.points,
-            binsReported: prev.profile.binsReported + 1,
-            streak: prev.profile.streak + 1,
-            submissions: [submission, ...prev.profile.submissions].slice(0, 50),
+            points: nextPoints,
+            binsReported: nextBins,
+            streak: nextStreak,
+            submissions: [
+              submission,
+              ...prev.profile.submissions.filter((s) => s.id !== finalId),
+            ].slice(0, 50),
           },
         }
-        saveState(next)
+        saveState(next, username)
         void syncProfileToServer(username, next.profile)
         return next
       })
 
-      if (lat != null && lng != null) {
-        const published = await publishReport({
-          lat,
-          lng,
-          category: analysis.category,
-          type: analysis.type,
-          label: analysis.label,
-          photoUrl: options?.photoUrl,
-          userName: username,
-          points: analysis.points,
-        })
-        if (published) {
-          setState((prev) => {
-            const next = {
-              ...prev,
-              profile: {
-                ...prev.profile,
-                submissions: prev.profile.submissions.map((s) =>
-                  s.id === submissionId ? { ...s, id: published.id } : s,
-                ),
-              },
-            }
-            saveState(next)
-            void syncProfileToServer(username, next.profile)
-            return next
-          })
-          if (!realtimeConnected) {
-            setSharedReports((prev) => [published, ...prev.filter((r) => r.id !== published.id)])
-          }
-        }
+      if (report && !realtimeConnected) {
+        setSharedReports((prev) => [report, ...prev.filter((r) => r.id !== report.id)])
       }
     },
     [realtimeConnected, username],
@@ -327,53 +310,43 @@ export function AppProvider({
   const updateName = useCallback((name: string) => {
     setState((prev) => {
       const next = { ...prev, profile: { ...prev.profile, name } }
-      saveState(next)
+      saveState(next, username)
       return next
     })
-  }, [])
+  }, [username])
 
   const redeemProduct = useCallback(
-    (productId: string): { ok: true; code: string } | { ok: false; reason: string } => {
+    async (
+      productId: string,
+    ): Promise<{ ok: true; code: string } | { ok: false; reason: string }> => {
       const product = SHOP_PRODUCTS.find((p) => p.id === productId)
       if (!product) return { ok: false, reason: 'Mahsulot topilmadi' }
 
-      let result: { ok: true; code: string } | { ok: false; reason: string } = {
-        ok: false,
-        reason: 'Ball yetarli emas',
+      if (state.profile.points < product.pointsCost) {
+        return { ok: false, reason: 'Ball yetarli emas' }
+      }
+      const already = state.profile.redeemedCoupons.some((c) => c.productId === productId)
+      if (already) {
+        return { ok: false, reason: 'Bu kupon allaqachon olingan' }
       }
 
-      setState((prev) => {
-        if (prev.profile.points < product.pointsCost) {
-          result = { ok: false, reason: 'Ball yetarli emas' }
-          return prev
-        }
-        const already = prev.profile.redeemedCoupons.some((c) => c.productId === productId)
-        if (already) {
-          result = { ok: false, reason: 'Bu kupon allaqachon olingan' }
-          return prev
-        }
+      const res = await redeemShopProduct(username, productId, product.pointsCost)
+      if (!res.ok || !res.code) {
+        return { ok: false, reason: res.reason || 'Kuponni xarid qilib bo‘lmadi' }
+      }
 
-        const code = makeCouponCode(productId)
-        const next: AppState = {
-          ...prev,
-          profile: {
-            ...prev.profile,
-            points: prev.profile.points - product.pointsCost,
-            redeemedCoupons: [
-              { productId, code, redeemedAt: new Date().toISOString() },
-              ...prev.profile.redeemedCoupons,
-            ],
-          },
-        }
-        saveState(next)
-        result = { ok: true, code }
-        void syncProfileToServer(username, next.profile)
-        return next
-      })
+      if (res.profile) {
+        setState((prev) => {
+          const merged = mergeUserProfile(prev.profile, res.profile!)
+          const next = { ...prev, profile: merged }
+          saveState(next, username)
+          return next
+        })
+      }
 
-      return result
+      return { ok: true, code: res.code }
     },
-    [username],
+    [state.profile.points, state.profile.redeemedCoupons, username],
   )
 
   const value = useMemo(

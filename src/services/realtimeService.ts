@@ -30,7 +30,12 @@ export type RealtimeHandlers = {
   onHiddenItemAdded?: (itemId: string) => void
   onNotificationCreated?: (notification: BindyNotification) => void
   onNotificationsRead?: () => void
-  onUserStatsUpdated?: (stats: { username: string; points: number; reports: number }) => void
+  onUserStatsUpdated?: (stats: {
+    username: string
+    points: number
+    reports: number
+    streak?: number
+  }) => void
   onUserProfileUpdated?: (profile: ServerUserProfile) => void
   onLeaderboardUpdated?: (data: { totalUsers: number; top: LeaderboardUser[] }) => void
 }

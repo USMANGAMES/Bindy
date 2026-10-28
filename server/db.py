@@ -235,15 +235,27 @@ def sync_user_profile(username: str, data: dict) -> dict:
 
     # Load current
     cur_profile = get_user_profile(uname)
-    points = data.get("points") if data.get("points") is not None else cur_profile["points"]
-    bins_reported = data.get("binsReported") if data.get("binsReported") is not None else cur_profile["binsReported"]
-    streak = data.get("streak") if data.get("streak") is not None else cur_profile["streak"]
+    # Server is Single Source of Truth for points and binsReported:
+    # Points and reports count are strictly managed by add_report and admin moderation.
+    points = cur_profile["points"]
+    bins_reported = cur_profile["binsReported"]
+    streak = max(cur_profile["streak"], int(data["streak"])) if data.get("streak") is not None else cur_profile["streak"]
 
     subs = data.get("submissions") if data.get("submissions") is not None else cur_profile["submissions"]
-    coupons = data.get("redeemedCoupons") if data.get("redeemedCoupons") is not None else cur_profile["redeemedCoupons"]
+    
+    # Merge coupons safely: never lose existing redeemed coupons
+    cur_coupons = cur_profile.get("redeemedCoupons", [])
+    data_coupons = data.get("redeemedCoupons") or []
+    seen_coupon_keys = set()
+    merged_coupons = []
+    for c in cur_coupons + data_coupons:
+        key = (c.get("productId"), c.get("code"))
+        if key not in seen_coupon_keys:
+            seen_coupon_keys.add(key)
+            merged_coupons.append(c)
 
     subs_json = json.dumps(subs[:50], ensure_ascii=False)
-    coupons_json = json.dumps(coupons, ensure_ascii=False)
+    coupons_json = json.dumps(merged_coupons, ensure_ascii=False)
     now_str = _now()
 
     with con:
@@ -261,6 +273,79 @@ def sync_user_profile(username: str, data: dict) -> dict:
         )
     con.close()
     return get_user_profile(uname)
+
+
+def redeem_product(username: str, product_id: str, cost: int, code: Optional[str] = None) -> dict:
+    import random
+    uname = username.strip()
+    if not uname:
+        return {"ok": False, "reason": "Foydalanuvchi nomi ko'rsatilmadi"}
+    if cost <= 0:
+        return {"ok": False, "reason": "Noto'g'ri narx"}
+
+    con = get_db()
+    try:
+        with con:
+            row = con.execute(
+                "SELECT user_id, points, coupons_json FROM profiles WHERE username = ?",
+                (uname,),
+            ).fetchone()
+            if not row:
+                return {"ok": False, "reason": "Foydalanuvchi profili topilmadi"}
+
+            current_points = row["points"]
+            try:
+                coupons = json.loads(row["coupons_json"])
+            except Exception:
+                coupons = []
+
+            # Check if product is already redeemed
+            if any(c.get("productId") == product_id for c in coupons):
+                return {"ok": False, "reason": "Bu kupon allaqachon olingan"}
+
+            if current_points < cost:
+                return {"ok": False, "reason": "Ball yetarli emas"}
+
+            if not code:
+                prefix = product_id.split("-")[0].upper()[:4]
+                code = f"BINDY-{prefix}-{random.randint(1000, 9999)}"
+
+            now_str = _now()
+            new_coupon = {
+                "productId": product_id,
+                "code": code,
+                "redeemedAt": now_str,
+            }
+            updated_coupons = [new_coupon] + coupons
+            coupons_json_str = json.dumps(updated_coupons, ensure_ascii=False)
+
+            cur = con.execute(
+                """UPDATE profiles
+                   SET points = points - ?,
+                       coupons_json = ?,
+                       updated_at = ?
+                   WHERE username = ? AND points >= ?""",
+                (cost, coupons_json_str, now_str, uname, cost),
+            )
+            if cur.rowcount == 0:
+                return {"ok": False, "reason": "Ball yetarli emas"}
+    finally:
+        con.close()
+
+    updated_profile = get_user_profile(uname)
+    user_stats = {
+        "username": uname,
+        "points": updated_profile["points"],
+        "reports": updated_profile["binsReported"],
+        "streak": updated_profile["streak"],
+    }
+    return {
+        "ok": True,
+        "code": code,
+        "coupon": new_coupon,
+        "profile": updated_profile,
+        "userStats": user_stats,
+    }
 
 
 def add_user_points(username: str, delta_points: int, delta_reports: int = 1) -> None:
@@ -311,7 +396,7 @@ def list_reports(limit: int = 500) -> list:
 
 
 def add_report(payload: dict) -> dict:
-    report_id = str(uuid.uuid4())
+    report_id = payload.get("id") or str(uuid.uuid4())
     now_str = _now()
     username = payload.get("userName", "").strip()
     user_id = payload.get("userId")
@@ -324,6 +409,44 @@ def add_report(payload: dict) -> dict:
         if u:
             user_id = u["id"]
 
+    # ── Deduplication Checks ──────────────────────────────────
+    # 1. By ID: if report already exists, return it directly without awarding points again
+    existing = con.execute("SELECT id FROM reports WHERE id = ?", (report_id,)).fetchone()
+    if existing:
+        con.close()
+        rep = get_report(report_id)
+        return rep if rep else {"id": report_id}
+
+    # 2. By Photo URL (if photo exists and was submitted by this user in last 10 minutes)
+    photo_url = payload.get("photoUrl")
+    if photo_url and username:
+        dup = con.execute(
+            """SELECT id FROM reports 
+               WHERE username = ? AND photo_url = ? AND created_at >= datetime('now', '-10 minutes')""",
+            (username, photo_url),
+        ).fetchone()
+        if dup:
+            con.close()
+            rep = get_report(dup["id"])
+            return rep if rep else {"id": dup["id"]}
+
+    # 3. By Exact Coordinates for same user within last 1 minute
+    lat = float(payload["lat"])
+    lng = float(payload["lng"])
+    if username:
+        dup_geo = con.execute(
+            """SELECT id FROM reports 
+               WHERE username = ? 
+                 AND ABS(lat - ?) < 0.0001 
+                 AND ABS(lng - ?) < 0.0001 
+                 AND created_at >= datetime('now', '-1 minute')""",
+            (username, lat, lng),
+        ).fetchone()
+        if dup_geo:
+            con.close()
+            rep = get_report(dup_geo["id"])
+            return rep if rep else {"id": dup_geo["id"]}
+
     with con:
         con.execute(
             """INSERT INTO reports (id, user_id, username, lat, lng, category, type, label, photo_url, points, created_at)
@@ -332,12 +455,12 @@ def add_report(payload: dict) -> dict:
                 report_id,
                 user_id,
                 username,
-                float(payload["lat"]),
-                float(payload["lng"]),
+                lat,
+                lng,
                 payload["category"],
                 payload["type"],
                 payload.get("label", ""),
-                payload.get("photoUrl"),
+                photo_url,
                 points,
                 now_str,
             ),
@@ -351,12 +474,12 @@ def add_report(payload: dict) -> dict:
         "id": report_id,
         "userId": user_id,
         "userName": username,
-        "lat": payload["lat"],
-        "lng": payload["lng"],
+        "lat": lat,
+        "lng": lng,
         "category": payload["category"],
         "type": payload["type"],
         "label": payload.get("label", ""),
-        "photoUrl": payload.get("photoUrl"),
+        "photoUrl": photo_url,
         "points": points,
         "createdAt": now_str,
     }

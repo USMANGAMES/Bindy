@@ -63,8 +63,8 @@ export async function pushPendingReports(
       points: s.points,
     })
     if (published) {
-      pushed.push(published)
-      idMap.set(s.id, published.id)
+      pushed.push(published.report)
+      idMap.set(s.id, published.report.id)
     }
   }
 
@@ -98,9 +98,14 @@ export function mergeUserProfile(
 
   return {
     ...local,
-    points: Math.max(local.points, server.points ?? 0),
-    binsReported: Math.max(local.binsReported, server.binsReported ?? server.reports ?? 0),
-    streak: Math.max(local.streak, server.streak ?? 0),
+    points: typeof server.points === 'number' ? server.points : local.points,
+    binsReported:
+      typeof server.binsReported === 'number'
+        ? server.binsReported
+        : typeof server.reports === 'number'
+          ? server.reports
+          : local.binsReported,
+    streak: typeof server.streak === 'number' ? server.streak : local.streak,
     submissions,
     redeemedCoupons: [...couponMap.values()],
   }
