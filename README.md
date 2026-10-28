@@ -36,7 +36,7 @@
 * **Server-Sent Events (SSE):** Real-time streaming (`/api/v1/events/stream`) pushes community updates to all connected users.
 
 ### 🏆 Gamification, Coin Shop & Profiles
-* **Dynamic Eco-Points:** Earn points for contributing verified reports and maintaining daily clean-up streaks.
+* **Dynamic Eco-Points:** Earn points for contributing verified reports and maintaining daily clean-up streaks. Complete economy rules and calculation algorithms are documented in [docs/POINTS_SYSTEM.md](docs/POINTS_SYSTEM.md).
 * **Live Leaderboard:** Real-time city ranking calculated from database activity.
 * **Coin Shop:** Redeem points for partner vouchers and promotional discounts.
 * **Offline-Ready PWA:** Installable directly to mobile home screens with custom splash screens, offline fallback, and iOS safe-area support.
