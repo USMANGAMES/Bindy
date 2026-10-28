@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { useNearbyBins } from '../../hooks/useNearbyBins'
 import { useCommunityReports, toMapTarget } from '../../hooks/useCommunityReports'
@@ -14,6 +14,7 @@ import { BinDetailSheet } from '../map/BinDetailSheet'
 import { CommunityReportSheet } from '../map/CommunityReportSheet'
 import { NearbyBinsPanel } from '../map/NearbyBinsPanel'
 import { NavigationPanel } from '../map/NavigationPanel'
+import { CoarseLocationPrompt } from '../map/CoarseLocationPrompt'
 import { useApp } from '../../context/AppContext'
 import { useAuth } from '../../context/AuthContext'
 import { isAdminUsername } from '../../config/admins'
@@ -33,7 +34,7 @@ export function MapScreen() {
   } = useApp()
   const { user } = useAuth()
   const adminUser = user && isAdminUsername(user.username) ? user.username : undefined
-  const { position, accuracy, loading, refresh } = useGeolocation()
+  const { position, accuracy, loading, refresh, isCoarse, hasAccurateFix } = useGeolocation()
   const nearbyBins = useNearbyBins(position, 1, hiddenItemIds)
   const community = useCommunityReports(position)
   const nav = useNavigation(position)
@@ -41,6 +42,7 @@ export function MapScreen() {
   const [selectedReport, setSelectedReport] = useState<CommunityReport | null>(null)
   const [layerFilter, setLayerFilter] = useState<MapLayerFilter>({ bin: true, trash: true })
   const [alertsOpen, setAlertsOpen] = useState(false)
+  const [coarsePromptOpen, setCoarsePromptOpen] = useState(false)
   const [mapStyle, setMapStyle] = useState<MapStyle>(() => {
     return (localStorage.getItem('bindy-map-style') as MapStyle) || 'voyager'
   })
@@ -49,12 +51,24 @@ export function MapScreen() {
 
   const handleLocate = () => {
     refresh()
-    setLocateTrigger(Date.now())
+    if (isCoarse || !hasAccurateFix) {
+      setCoarsePromptOpen(true)
+    } else {
+      setLocateTrigger(Date.now())
+    }
   }
 
   const visibleTrash = layerFilter.trash ? community.trash : []
   const visibleCommunityBins = layerFilter.bin ? community.bins : []
   const visibleSeedBins = layerFilter.bin ? nearbyBins : []
+
+  // Avtomatik ravishda aniq GPS topilganda shtorkani yopish va foydalanuvchiga uchib borish
+  useEffect(() => {
+    if (hasAccurateFix && !isCoarse && coarsePromptOpen) {
+      setCoarsePromptOpen(false)
+      setLocateTrigger(Date.now())
+    }
+  }, [hasAccurateFix, isCoarse, coarsePromptOpen])
 
   useEffect(() => {
     if (selectedReport?.category === 'trash' && !layerFilter.trash) {
@@ -130,8 +144,22 @@ export function MapScreen() {
         mapStyle={mapStyle}
         locateTrigger={locateTrigger}
         accuracy={accuracy}
+        hasAccurateFix={hasAccurateFix && !isCoarse}
       />
       <MapHeader />
+      {isCoarse && (
+        <motion.button
+          type="button"
+          onClick={() => setCoarsePromptOpen(true)}
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute left-1/2 top-[calc(max(0.75rem,env(safe-area-inset-top))+4.5rem)] z-[600] flex max-w-[92%] -translate-x-1/2 items-center gap-2 rounded-2xl bg-amber-500/95 px-3.5 py-2 text-xs font-semibold text-white shadow-soft backdrop-blur-md transition active:scale-95"
+        >
+          <span className="flex h-2 w-2 shrink-0 rounded-full bg-white animate-ping" />
+          <span className="truncate">Joylashuv taxminiy (~1 km). To‘g‘rilash</span>
+          <span className="shrink-0 text-amber-100 font-bold">➔</span>
+        </motion.button>
+      )}
       <MapControls onLocate={handleLocate} loading={loading} />
       <MapCategoryFilter
         filter={layerFilter}
@@ -209,6 +237,13 @@ export function MapScreen() {
           setMapStyle(s)
           localStorage.setItem('bindy-map-style', s)
         }}
+      />
+
+      <CoarseLocationPrompt
+        open={coarsePromptOpen}
+        onClose={() => setCoarsePromptOpen(false)}
+        onRefresh={handleLocate}
+        hasAccurateFix={hasAccurateFix}
       />
     </div>
   )
