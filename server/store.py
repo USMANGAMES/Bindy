@@ -41,6 +41,10 @@ def sync_user_profile(username: str, payload: dict) -> dict:
     return db.sync_user_profile(username, payload)
 
 
+def redeem_product(username: str, product_id: str, cost: int, code: Optional[str] = None) -> dict:
+    return db.redeem_product(username, product_id, cost, code)
+
+
 def list_leaderboard(limit: int = 10) -> dict:
     return db.list_leaderboard(limit)
 

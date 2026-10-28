@@ -11,6 +11,8 @@ import type { AuthUser } from '../services/authService'
 import { isAdminUsername } from '../config/admins'
 import {
   clearAuth,
+  fetchCurrentUser,
+  getStoredToken,
   getStoredUser,
   loginUser,
   registerUser,
@@ -39,8 +41,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
-    setUser(verifySession())
+    const stored = verifySession()
+    setUser(stored)
     setLoading(false)
+
+    if (stored) {
+      // Re-validate against server to immediately update isAdmin & session status
+      void fetchCurrentUser().then((fresh) => {
+        if (fresh) {
+          setUser(fresh)
+        } else if (!getStoredToken()) {
+          setUser(null)
+        }
+      })
+    }
+
+    const syncWithServer = () => {
+      if (getStoredToken()) {
+        void fetchCurrentUser().then((fresh) => {
+          if (fresh) setUser(fresh)
+        })
+      }
+    }
+
+    window.addEventListener('focus', syncWithServer)
+    return () => window.removeEventListener('focus', syncWithServer)
   }, [])
 
   const login = useCallback(async (username: string, password: string) => {

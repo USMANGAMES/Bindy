@@ -13,3 +13,4 @@ services:
       - server/.env
     volumes:
       - ./server/data:/app/server/data
+      - ./server/.env:/app/server/.env:ro

@@ -63,8 +63,8 @@ export async function pushPendingReports(
       points: s.points,
     })
     if (published) {
-      pushed.push(published)
-      idMap.set(s.id, published.id)
+      pushed.push(published.report)
+      idMap.set(s.id, published.report.id)
     }
   }
 

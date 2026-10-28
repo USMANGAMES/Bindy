@@ -27,16 +27,25 @@ export type CreateReportPayload = {
   points: number
 }
 
+export type PublishReportResponse = {
+  report: SharedReport
+  userStats?: {
+    points: number
+    reports: number
+    streak: number
+  }
+}
+
 /** POST /api/v1/reports — boshqalarga ko‘rinsin */
-export async function publishReport(payload: CreateReportPayload): Promise<SharedReport | null> {
+export async function publishReport(payload: CreateReportPayload): Promise<PublishReportResponse | null> {
   if (!API_ENABLED || !isServerOnline()) return null
   try {
-    const data = await apiFetch<{ report: SharedReport }>('/api/v1/reports', {
+    const data = await apiFetch<PublishReportResponse>('/api/v1/reports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    return data.report ?? null
+    return data && data.report ? data : null
   } catch (e) {
     console.warn('[bindy] publish report failed', e)
     return null

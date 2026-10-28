@@ -41,10 +41,11 @@ from store import (
     list_notifications,
     list_reports,
     mark_notifications_read,
+    redeem_product,
     sync_user_profile,
 )
 
-load_dotenv(Path(__file__).parent / ".env")
+load_dotenv(Path(__file__).parent / ".env", override=True)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -182,6 +183,22 @@ class ProfileSyncBody(BaseModel):
     redeemedCoupons: Optional[list] = None
 
 
+class RedeemShopBody(BaseModel):
+    productId: str
+    cost: Optional[int] = None
+    code: Optional[str] = None
+    username: Optional[str] = None
+
+
+SHOP_PRODUCT_COSTS: dict[str, int] = {
+    "belissimo-15": 150,
+    "dominos-20": 200,
+    "kfc-10": 120,
+    "cafe-25": 180,
+    "evos-12": 100,
+}
+
+
 # ── Auth Endpoints ────────────────────────────────────────────
 
 
@@ -274,10 +291,7 @@ async def events_stream(username: str = ""):
                     msg = await asyncio.wait_for(q.get(), timeout=25.0)
                     event_type = msg["type"]
                     data = msg["data"]
-                    if event_type == "notification.created":
-                        if data.get("username", "") != username.strip():
-                            continue
-                    if event_type == "user.stats_updated":
+                    if event_type in ("notification.created", "user.stats_updated", "user.profile_updated"):
                         if data.get("username", "") != username.strip():
                             continue
                     yield format_sse(event_type, data)
@@ -337,11 +351,12 @@ def create_report(
     log.info("Report saqlandi: %s (%s, %d ball)", username, body.category, points)
     broadcast.emit("report.created", {"report": report})
     emit_stats()
+    user_stats = get_user_stats(username)
     broadcast.emit(
         "user.stats_updated",
-        {"username": username.strip(), "stats": get_user_stats(username)},
+        {"username": username.strip(), "stats": user_stats},
     )
-    return {"report": report}
+    return {"report": report, "userStats": user_stats}
 
 
 @app.delete("/api/v1/reports/{report_id}")
@@ -420,6 +435,40 @@ def sync_user(body: SyncUserBody):
     )
     emit_stats()
     return {"user": user}
+
+
+@app.post("/api/v1/shop/redeem")
+@limiter.limit("20/minute")
+def redeem_shop_coupon(
+    request: Request,
+    body: RedeemShopBody,
+    user: Optional[dict] = Depends(get_optional_user),
+):
+    uname = (user["username"] if user else (body.username or "")).strip()
+    if not uname:
+        raise HTTPException(400, "Foydalanuvchi aniqlanmadi")
+
+    cost = SHOP_PRODUCT_COSTS.get(body.productId)
+    if cost is None:
+        if body.cost is not None and body.cost > 0:
+            cost = body.cost
+        else:
+            raise HTTPException(400, "Mahsulot topilmadi")
+
+    res = redeem_product(uname, body.productId, cost, body.code)
+    if not res.get("ok"):
+        raise HTTPException(400, res.get("reason", "Kuponni xarid qilib bo'lmadi"))
+
+    broadcast.emit(
+        "user.stats_updated",
+        {"username": uname, "stats": res["userStats"]},
+    )
+    broadcast.emit(
+        "user.profile_updated",
+        {"username": uname, "profile": res["profile"]},
+    )
+    emit_stats()
+    return res
 
 
 @app.get("/api/v1/leaderboard")

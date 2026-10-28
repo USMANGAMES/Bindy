@@ -235,15 +235,27 @@ def sync_user_profile(username: str, data: dict) -> dict:
 
     # Load current
     cur_profile = get_user_profile(uname)
-    points = max(cur_profile["points"], int(data["points"])) if data.get("points") is not None else cur_profile["points"]
-    bins_reported = max(cur_profile["binsReported"], int(data["binsReported"])) if data.get("binsReported") is not None else cur_profile["binsReported"]
+    # Server is Single Source of Truth for points and binsReported:
+    # Points and reports count are strictly managed by add_report and admin moderation.
+    points = cur_profile["points"]
+    bins_reported = cur_profile["binsReported"]
     streak = max(cur_profile["streak"], int(data["streak"])) if data.get("streak") is not None else cur_profile["streak"]
 
     subs = data.get("submissions") if data.get("submissions") is not None else cur_profile["submissions"]
-    coupons = data.get("redeemedCoupons") if data.get("redeemedCoupons") is not None else cur_profile["redeemedCoupons"]
+    
+    # Merge coupons safely: never lose existing redeemed coupons
+    cur_coupons = cur_profile.get("redeemedCoupons", [])
+    data_coupons = data.get("redeemedCoupons") or []
+    seen_coupon_keys = set()
+    merged_coupons = []
+    for c in cur_coupons + data_coupons:
+        key = (c.get("productId"), c.get("code"))
+        if key not in seen_coupon_keys:
+            seen_coupon_keys.add(key)
+            merged_coupons.append(c)
 
     subs_json = json.dumps(subs[:50], ensure_ascii=False)
-    coupons_json = json.dumps(coupons, ensure_ascii=False)
+    coupons_json = json.dumps(merged_coupons, ensure_ascii=False)
     now_str = _now()
 
     with con:
@@ -261,6 +273,79 @@ def sync_user_profile(username: str, data: dict) -> dict:
         )
     con.close()
     return get_user_profile(uname)
+
+
+def redeem_product(username: str, product_id: str, cost: int, code: Optional[str] = None) -> dict:
+    import random
+    uname = username.strip()
+    if not uname:
+        return {"ok": False, "reason": "Foydalanuvchi nomi ko'rsatilmadi"}
+    if cost <= 0:
+        return {"ok": False, "reason": "Noto'g'ri narx"}
+
+    con = get_db()
+    try:
+        with con:
+            row = con.execute(
+                "SELECT user_id, points, coupons_json FROM profiles WHERE username = ?",
+                (uname,),
+            ).fetchone()
+            if not row:
+                return {"ok": False, "reason": "Foydalanuvchi profili topilmadi"}
+
+            current_points = row["points"]
+            try:
+                coupons = json.loads(row["coupons_json"])
+            except Exception:
+                coupons = []
+
+            # Check if product is already redeemed
+            if any(c.get("productId") == product_id for c in coupons):
+                return {"ok": False, "reason": "Bu kupon allaqachon olingan"}
+
+            if current_points < cost:
+                return {"ok": False, "reason": "Ball yetarli emas"}
+
+            if not code:
+                prefix = product_id.split("-")[0].upper()[:4]
+                code = f"BINDY-{prefix}-{random.randint(1000, 9999)}"
+
+            now_str = _now()
+            new_coupon = {
+                "productId": product_id,
+                "code": code,
+                "redeemedAt": now_str,
+            }
+            updated_coupons = [new_coupon] + coupons
+            coupons_json_str = json.dumps(updated_coupons, ensure_ascii=False)
+
+            cur = con.execute(
+                """UPDATE profiles
+                   SET points = points - ?,
+                       coupons_json = ?,
+                       updated_at = ?
+                   WHERE username = ? AND points >= ?""",
+                (cost, coupons_json_str, now_str, uname, cost),
+            )
+            if cur.rowcount == 0:
+                return {"ok": False, "reason": "Ball yetarli emas"}
+    finally:
+        con.close()
+
+    updated_profile = get_user_profile(uname)
+    user_stats = {
+        "username": uname,
+        "points": updated_profile["points"],
+        "reports": updated_profile["binsReported"],
+        "streak": updated_profile["streak"],
+    }
+    return {
+        "ok": True,
+        "code": code,
+        "coupon": new_coupon,
+        "profile": updated_profile,
+        "userStats": user_stats,
+    }
 
 
 def add_user_points(username: str, delta_points: int, delta_reports: int = 1) -> None:
