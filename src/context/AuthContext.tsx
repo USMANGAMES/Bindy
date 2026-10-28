@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const isAdmin = useMemo(
-    () => (user ? isAdminUsername(user.username) : false),
+    () => Boolean(user?.isAdmin || (user ? isAdminUsername(user.username) : false)),
     [user],
   )
 
