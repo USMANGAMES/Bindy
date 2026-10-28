@@ -33,7 +33,7 @@ export function MapScreen() {
     refreshHiddenItems,
   } = useApp()
   const { user } = useAuth()
-  const adminUser = user && isAdminUsername(user.username) ? user.username : undefined
+  const adminUser = user && (user.isAdmin || isAdminUsername(user.username)) ? user.username : undefined
   const { position, accuracy, loading, refresh, isCoarse, hasAccurateFix } = useGeolocation()
   const nearbyBins = useNearbyBins(position, 1, hiddenItemIds)
   const community = useCommunityReports(position)

@@ -1,5 +1,5 @@
-/** Bosh admin username ro‘yxati — server/admin_config.py bilan bir xil */
-export const ADMIN_USERNAMES = ['Khafizov', 'zxsad1212'] as const
+/** Bosh admin username ro‘yxati (asosiy tekshiruv server orqali user.isAdmin da bo'ladi) */
+export const ADMIN_USERNAMES: readonly string[] = []
 
 export function isAdminUsername(username: string): boolean {
   const q = username.trim().toLowerCase()

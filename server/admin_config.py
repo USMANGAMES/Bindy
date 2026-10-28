@@ -2,7 +2,7 @@
 
 import os
 
-DEFAULT_ADMINS = "Khafizov,zxsad1212"
+DEFAULT_ADMINS = ""
 
 
 def admin_usernames() -> frozenset[str]:
